@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: soumission-service
+  namespace: al-mizan
+  labels:
+    app: soumission-service
+spec:
+  type: ClusterIP
+  selector:
+    app: soumission-service
+  ports:
+    - name: http
+      port: 8004
+      targetPort: http
+      protocol: TCP

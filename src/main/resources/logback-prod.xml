@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!--
+        Configuration Logback pour la production.
+        Format JSON structuré pour intégration avec ELK Stack / Loki / Splunk.
+        Activé automatiquement quand spring.profiles.active=prod
+    -->
+
+    <springProfile name="prod">
+        <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+                <pattern>{"timestamp":"%d{ISO8601}","level":"%level","logger":"%logger{36}","thread":"%thread","message":"%msg","exception":"%ex{short}"}%n</pattern>
+            </encoder>
+        </appender>
+
+        <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>/var/log/soumission-service/app.log</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                <fileNamePattern>/var/log/soumission-service/app.%d{yyyy-MM-dd}.log</fileNamePattern>
+                <maxHistory>30</maxHistory>
+                <totalSizeCap>1GB</totalSizeCap>
+            </rollingPolicy>
+            <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+                <pattern>{"timestamp":"%d{ISO8601}","level":"%level","logger":"%logger{36}","thread":"%thread","message":"%msg","exception":"%ex"}%n</pattern>
+            </encoder>
+        </appender>
+
+        <root level="WARN">
+            <appender-ref ref="STDOUT" />
+            <appender-ref ref="FILE" />
+        </root>
+
+        <logger name="com.klodit.soumission_service" level="INFO" />
+    </springProfile>
+
+    <springProfile name="!prod">
+        <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+                <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            </encoder>
+        </appender>
+
+        <root level="INFO">
+            <appender-ref ref="STDOUT" />
+        </root>
+
+        <logger name="com.klodit.soumission_service" level="DEBUG" />
+    </springProfile>
+</configuration>

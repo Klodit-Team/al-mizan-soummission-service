@@ -1,0 +1,222 @@
+# ═══════════════════════════════════════════════════════════
+# CI/CD Pipeline — soumission_service
+# Conformément au CSL : image Docker tagguée par commit SHA.
+#
+# Étapes :
+#   1. Checkout + Cache Maven
+#   2. Build + Tests unitaires
+#   3. Tests d'intégration (Testcontainers — Docker-in-Docker)
+#   4. Couverture JaCoCo (seuil ≥ 80%)
+#   5. Build image Docker multi-stage
+#   6. Tag : commit SHA + latest (si main)
+#   7. Push vers Container Registry
+#   8. Déploiement Kubernetes (staging auto, prod manuel)
+# ═══════════════════════════════════════════════════════════
+name: CI/CD — Soumission Service
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "src/**"
+      - "pom.xml"
+      - "Dockerfile"
+      - ".github/workflows/**"
+  pull_request:
+    branches: [main]
+
+env:
+  JAVA_VERSION: "21"
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/soumission-service
+
+jobs:
+  # ─────────────────────────────────────────────────
+  # JOB 1 : Build + Tests
+  # ─────────────────────────────────────────────────
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: soumission_db
+          MYSQL_ROOT_PASSWORD: testroot
+          MYSQL_USER: test
+          MYSQL_PASSWORD: test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: "temurin"
+          cache: "maven"
+
+      - name: Build + Tests unitaires
+        run: mvn clean verify -B -Dspring.profiles.active=test
+
+      - name: Rapport JaCoCo — vérification seuil ≥ 80%
+        run: mvn jacoco:check -B
+
+      - name: Upload rapport de couverture
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: target/site/jacoco/
+          retention-days: 14
+
+      - name: Publier résultats de tests
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: JUnit Tests
+          path: target/surefire-reports/*.xml
+          reporter: java-junit
+
+  # ─────────────────────────────────────────────────
+  # JOB 2 : Tests d'intégration (Testcontainers)
+  # ─────────────────────────────────────────────────
+  integration-tests:
+    name: Integration Tests (Testcontainers)
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: "temurin"
+          cache: "maven"
+
+      - name: Tests d'intégration
+        run: mvn verify -B -Dgroups=integration -Dspring.profiles.active=test
+
+  # ─────────────────────────────────────────────────
+  # JOB 3 : Build & Push Docker image
+  # ─────────────────────────────────────────────────
+  docker-build:
+    name: Docker Build & Push
+    runs-on: ubuntu-latest
+    needs: [build-and-test, integration-tests]
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Metadata Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # Tag avec le SHA du commit (conformité CSL)
+            type=sha,prefix=,format=short
+            # Tag latest sur main uniquement
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            # Tag avec la branche
+            type=ref,event=branch
+
+      - name: Build & Push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ─────────────────────────────────────────────────
+  # JOB 4 : Déploiement Staging (automatique sur develop)
+  # ─────────────────────────────────────────────────
+  deploy-staging:
+    name: Deploy Staging
+    runs-on: ubuntu-latest
+    needs: docker-build
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Set kubeconfig
+        run: echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > $HOME/.kube/config
+
+      - name: Deploy to Staging
+        run: |
+          export IMAGE_TAG=$(echo ${{ github.sha }} | cut -c1-7)
+          kubectl set image deployment/soumission-service \
+            soumission-service=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} \
+            -n al-mizan
+          kubectl rollout status deployment/soumission-service -n al-mizan --timeout=120s
+
+  # ─────────────────────────────────────────────────
+  # JOB 5 : Déploiement Production (manuel sur main)
+  # ─────────────────────────────────────────────────
+  deploy-prod:
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    needs: docker-build
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://soumission.al-mizan.dz/actuator/health
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Set kubeconfig
+        run: echo "${{ secrets.KUBE_CONFIG_PROD }}" | base64 -d > $HOME/.kube/config
+
+      - name: Deploy to Production
+        run: |
+          export IMAGE_TAG=$(echo ${{ github.sha }} | cut -c1-7)
+          kubectl set image deployment/soumission-service \
+            soumission-service=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} \
+            -n al-mizan
+          kubectl rollout status deployment/soumission-service -n al-mizan --timeout=180s
+
+      - name: Smoke test
+        run: |
+          sleep 10
+          curl -f https://soumission.al-mizan.dz/actuator/health || exit 1

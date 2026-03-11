@@ -1,0 +1,62 @@
+package com.klodit.soumission_service.controller;
+
+import com.klodit.soumission_service.dto.response.ApiResponse;
+import com.klodit.soumission_service.dto.response.CleChiffrementResponse;
+import com.klodit.soumission_service.security.RbacGuard;
+import com.klodit.soumission_service.service.CleChiffrementService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/v1/cles-chiffrement")
+@RequiredArgsConstructor
+@Tag(name = "Clés de Chiffrement", description = "Génération et gestion des clés RSA-4096 / Shamir")
+public class CleChiffrementController {
+
+        private final CleChiffrementService cleChiffrementService;
+        private final RbacGuard rbacGuard;
+
+        /**
+         * US-6 : Générer la paire de clés RSA-4096 pour un AO (Shamir K-of-N)
+         * Normalement déclenché automatiquement par AppelOffreEventConsumer (RabbitMQ).
+         * Cet endpoint HTTP est réservé à l'ADMIN pour une génération manuelle/fallback
+         * si l'event a échoué.
+         */
+        @PostMapping("/{aoId}")
+        @Operation(summary = "Générer les clés pour un AO", description = "Génère une paire RSA-4096. La clé privée est fragmentée "
+                        + "en N parts Shamir distribuées aux membres de la commission.")
+        public ResponseEntity<ApiResponse<CleChiffrementResponse>> genererCles(
+                        @PathVariable String aoId,
+                        @RequestBody List<String> membresCommission,
+                        HttpServletRequest httpServletRequest) {
+
+                rbacGuard.requireRole(httpServletRequest, "ADMIN");
+                CleChiffrementResponse response = cleChiffrementService.genererCles(aoId, membresCommission);
+                return ResponseEntity.status(HttpStatus.CREATED)
+                                .body(ApiResponse.ok(response, "Clés RSA-4096 générées — " +
+                                                membresCommission.size() + " fragments Shamir créés"));
+        }
+
+        /**
+         * Récupérer la clé publique d'un AO (pour le chiffrement côté client).
+         * Accessible à l'opérateur économique avant de chiffrer son offre financière.
+         */
+        @GetMapping("/{aoId}/publique")
+        @Operation(summary = "Récupérer la clé publique", description = "Retourne la clé publique RSA-4096 PEM de l'AO. "
+                        + "Utilisée par l'opérateur pour chiffrer l'offre financière.")
+        public ResponseEntity<ApiResponse<CleChiffrementResponse>> getClePublique(
+                        @PathVariable String aoId,
+                        HttpServletRequest httpServletRequest) {
+
+                rbacGuard.requireRole(httpServletRequest, "OPERATEUR_ECONOMIQUE", "ADMIN");
+                CleChiffrementResponse response = cleChiffrementService.getClePublique(aoId);
+                return ResponseEntity.ok(ApiResponse.ok(response));
+        }
+}
