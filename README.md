@@ -42,12 +42,12 @@ soumission-service  (port 8004)
 
 Le service fait partie d'une architecture microservices et communique avec :
 
-| Service                 | Rôle                                               | Protocole  |
-| ----------------------- | -------------------------------------------------- | ---------- |
-| **auth-service**        | Validation des sessions Redis                      | Redis      |
-| **utilisateur-service** | Vérification d'éligibilité des opérateurs          | REST/Feign |
-| **appel-offre-service** | Récupération des données AO                        | REST/Feign |
-| **documents-service**   | Vérification des pièces administratives (port 8005)| REST/Feign |
+| Service                 | Rôle                                                | Protocole  |
+| ----------------------- | --------------------------------------------------- | ---------- |
+| **auth-service**        | Validation des sessions Redis                       | Redis      |
+| **utilisateur-service** | Vérification d'éligibilité des opérateurs           | REST/Feign |
+| **appel-offre-service** | Récupération des données AO                         | REST/Feign |
+| **documents-service**   | Vérification des pièces administratives (port 8005) | REST/Feign |
 
 ---
 
@@ -295,13 +295,20 @@ Request
 
 ### Authentification
 
-Les sessions sont stockées dans **Redis** par l'auth-service. Chaque requête doit porter l'en-tête :
+Les sessions sont stockées dans **Redis** par l'auth-service. En production, chaque requête doit porter l'en-tête :
 
 ```
 X-Session-Id: <session-token>
 ```
 
-Le filtre valide le token contre Redis et injecte `userId` et `userRole` comme attributs de la requête.
+Le filtre (`SessionValidationFilter`) effectue dans l'ordre :
+
+1. Vérifie l'existence de la session (`SESSION:{sessionId}`) dans Redis
+2. Vérifie que la session n'est pas expirée
+3. Vérifie que l'`accessToken` n'est pas blacklisté (`BLACKLIST:{accessToken}`) — révocation lors d'un logout ou rotation de token
+4. Injecte `userId` et `userRole` comme attributs de la requête
+
+**Mode développement** (`security.dev-fallback.enabled=true`) : les en-têtes `X-User-Id` et `X-User-Role` sont acceptés directement, sans session Redis.
 
 ### Rôles
 
@@ -389,21 +396,21 @@ com.klodit.soumission_service.util.**" -DfailIfNoTests=false
 
 **Résultats** : 193 tests (184 unitaires + 9 intégration), 0 échecs, 0 erreurs.
 
-| Classe de test                        | Tests | Catégorie   |
-| ------------------------------------- | ----- | ----------- |
-| `SoumissionControllerTest`            | 12    | Controller  |
-| `SoumissionServiceTest`               | 19    | Service     |
-| `OffreTechniqueServiceTest`           | 9     | Service     |
-| `OffreFinanciereControllerTest`       | 7     | Controller  |
-| `GlobalExceptionHandlerTest`          | 12    | Exception   |
-| `AppelOffreEventConsumerTest`         | 7     | Messaging   |
-| `OffreFinanciereAnalyseConsumerTest`  | 7     | Messaging   |
-| `RateLimitingFilterTest`              | 7     | Sécurité    |
-| `RbacGuardTest`                       | 9     | Sécurité    |
-| `MetricsServiceTest`                  | 9     | Service     |
-| `SoumissionFlowIntegrationTest`       | 6     | Intégration |
-| `ChiffrementIntegrationTest`          | 3     | Intégration |
-| _(+ 22 autres classes)_               | …     | …           |
+| Classe de test                       | Tests | Catégorie   |
+| ------------------------------------ | ----- | ----------- |
+| `SoumissionControllerTest`           | 12    | Controller  |
+| `SoumissionServiceTest`              | 19    | Service     |
+| `OffreTechniqueServiceTest`          | 9     | Service     |
+| `OffreFinanciereControllerTest`      | 7     | Controller  |
+| `GlobalExceptionHandlerTest`         | 12    | Exception   |
+| `AppelOffreEventConsumerTest`        | 7     | Messaging   |
+| `OffreFinanciereAnalyseConsumerTest` | 7     | Messaging   |
+| `RateLimitingFilterTest`             | 7     | Sécurité    |
+| `RbacGuardTest`                      | 9     | Sécurité    |
+| `MetricsServiceTest`                 | 9     | Service     |
+| `SoumissionFlowIntegrationTest`      | 6     | Intégration |
+| `ChiffrementIntegrationTest`         | 3     | Intégration |
+| _(+ 22 autres classes)_              | …     | …           |
 
 ---
 
@@ -462,4 +469,3 @@ Propriétaire — **Klodit SARL** © 2025–2026. Tous droits réservés.
 
 Ce projet est développé dans le cadre de la plateforme Al-Mizan pour la gestion des marchés publics en Algérie (Loi 23-12).
 Toute reproduction ou utilisation sans autorisation écrite est interdite.
-
