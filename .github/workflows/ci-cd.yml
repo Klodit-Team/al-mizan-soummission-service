@@ -107,7 +107,7 @@ jobs:
           cache: "maven"
 
       - name: Tests d'intégration
-        run: mvn verify -B -Dgroups=integration -Dspring.profiles.active=test
+        run: mvn verify -B -Dgroups=integration -Dspring.profiles.active=test -Djacoco.skip=true
 
   # ─────────────────────────────────────────────────
   # JOB 3 : Build & Push Docker image
