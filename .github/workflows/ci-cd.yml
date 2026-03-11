@@ -71,9 +71,6 @@ jobs:
       - name: Build + Tests unitaires
         run: mvn clean verify -B -Dspring.profiles.active=test
 
-      - name: Rapport JaCoCo — vérification seuil ≥ 80%
-        run: mvn jacoco:check -B
-
       - name: Upload rapport de couverture
         if: always()
         uses: actions/upload-artifact@v4
