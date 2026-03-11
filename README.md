@@ -1,5 +1,11 @@
 # soumission-service
 
+![Java](https://img.shields.io/badge/Java-21-orange?logo=openjdk)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0.3-brightgreen?logo=springboot)
+![Tests](https://img.shields.io/badge/tests-193%20passing-success?logo=junit5)
+![Coverage](https://img.shields.io/badge/coverage-≥80%25-brightgreen?logo=jacoco)
+![License](https://img.shields.io/badge/license-Proprietary-red)
+
 Microservice de gestion des soumissions aux appels d'offres publics — Plateforme **Al-Mizan** (Klodit).
 
 Il couvre le cycle de vie complet d'une soumission : création du dossier, dépôt des pièces chiffrées, ouverture des plis par la commission et déchiffrement ECDSA/RSA-4096.
@@ -19,6 +25,7 @@ Il couvre le cycle de vie complet d'une soumission : création du dossier, dép�
 - [Tests](#tests)
 - [Kubernetes](#kubernetes)
 - [Monitoring](#monitoring)
+- [Licence](#licence)
 
 ---
 
@@ -35,9 +42,12 @@ soumission-service  (port 8004)
 
 Le service fait partie d'une architecture microservices et communique avec :
 
-- **auth-service** — validation des sessions Redis
-- **utilisateur-service** — vérification d'éligibilité des opérateurs
-- **appel-offre-service** — récupération des données AO
+| Service                 | Rôle                                               | Protocole  |
+| ----------------------- | -------------------------------------------------- | ---------- |
+| **auth-service**        | Validation des sessions Redis                      | Redis      |
+| **utilisateur-service** | Vérification d'éligibilité des opérateurs          | REST/Feign |
+| **appel-offre-service** | Récupération des données AO                        | REST/Feign |
+| **documents-service**   | Vérification des pièces administratives (port 8005)| REST/Feign |
 
 ---
 
@@ -377,7 +387,23 @@ com.klodit.soumission_service.util.**" -DfailIfNoTests=false
 # Rapport : target/site/jacoco/index.html
 ```
 
-**Résultats** : 215 tests unitaires, 0 échecs, 0 erreurs.
+**Résultats** : 193 tests (184 unitaires + 9 intégration), 0 échecs, 0 erreurs.
+
+| Classe de test                        | Tests | Catégorie   |
+| ------------------------------------- | ----- | ----------- |
+| `SoumissionControllerTest`            | 12    | Controller  |
+| `SoumissionServiceTest`               | 19    | Service     |
+| `OffreTechniqueServiceTest`           | 9     | Service     |
+| `OffreFinanciereControllerTest`       | 7     | Controller  |
+| `GlobalExceptionHandlerTest`          | 12    | Exception   |
+| `AppelOffreEventConsumerTest`         | 7     | Messaging   |
+| `OffreFinanciereAnalyseConsumerTest`  | 7     | Messaging   |
+| `RateLimitingFilterTest`              | 7     | Sécurité    |
+| `RbacGuardTest`                       | 9     | Sécurité    |
+| `MetricsServiceTest`                  | 9     | Service     |
+| `SoumissionFlowIntegrationTest`       | 6     | Intégration |
+| `ChiffrementIntegrationTest`          | 3     | Intégration |
+| _(+ 22 autres classes)_               | …     | …           |
 
 ---
 
@@ -427,4 +453,13 @@ Métriques personnalisées disponibles :
 - `soumission.dechiffrements.total` — nombre d'ouvertures de plis
 
 Endpoint de santé : `GET /actuator/health`
+
+---
+
+## Licence
+
+Propriétaire — **Klodit SARL** © 2025–2026. Tous droits réservés.
+
+Ce projet est développé dans le cadre de la plateforme Al-Mizan pour la gestion des marchés publics en Algérie (Loi 23-12).
+Toute reproduction ou utilisation sans autorisation écrite est interdite.
 
