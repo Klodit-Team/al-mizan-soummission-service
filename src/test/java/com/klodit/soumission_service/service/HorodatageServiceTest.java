@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -17,8 +18,9 @@ class HorodatageServiceTest {
     void maintenant_retourneDateNonNulle() {
         LocalDateTime result = horodatageService.maintenant();
 
+        LocalDateTime nowAlgiers = LocalDateTime.now(ZoneId.of("Africa/Algiers"));
         assertThat(result).isNotNull();
-        assertThat(result).isBeforeOrEqualTo(LocalDateTime.now().plusMinutes(1));
+        assertThat(result).isBeforeOrEqualTo(nowAlgiers.plusMinutes(1));
     }
 
     @Test
