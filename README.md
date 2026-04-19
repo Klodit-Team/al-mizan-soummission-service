@@ -139,7 +139,7 @@ docker exec soumission-redis redis-cli ping
 **Option A — Mode développement (recommandé)**
 
 ```powershell
-.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=dev"
+.\mvnw.cmd "-Dspring-boot.run.profiles=dev" spring-boot:run
 ```
 
 Le profil `dev` active : `ddl-auto=update`, SQL visible dans les logs, Swagger UI activé, filtre de sécurité désactivé (pas besoin de session Redis).

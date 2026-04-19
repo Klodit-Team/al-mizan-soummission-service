@@ -34,8 +34,8 @@ public class RbacGuard {
      * @throws AccesInterditException si le rôle n'est pas autorisé
      */
     public void requireRole(HttpServletRequest request, String... rolesPermis) {
-        String userRole = (String) request.getAttribute("userRole");
-        String userId = (String) request.getAttribute("userId");
+        String userRole = resolveUserRole(request);
+        String userId = resolveUserId(request);
 
         if (userRole == null) {
             throw new AccesInterditException("Rôle utilisateur non défini dans la session");
@@ -61,7 +61,7 @@ public class RbacGuard {
      * Extrait l'ID utilisateur de la requête.
      */
     public String getUserId(HttpServletRequest request) {
-        String userId = (String) request.getAttribute("userId");
+        String userId = resolveUserId(request);
         if (userId == null || userId.isBlank()) {
             throw new AccesInterditException("ID utilisateur non défini dans la session");
         }
@@ -72,7 +72,46 @@ public class RbacGuard {
      * Extrait le rôle de la requête.
      */
     public String getUserRole(HttpServletRequest request) {
-        String role = (String) request.getAttribute("userRole");
+        String role = resolveUserRole(request);
         return role != null ? role : "UNKNOWN";
+    }
+
+    private String resolveUserId(HttpServletRequest request) {
+        String userId = (String) request.getAttribute("userId");
+        if (userId != null && !userId.isBlank()) {
+            return userId;
+        }
+
+        String userIdHeader = request.getHeader("X-User-Id");
+        if (userIdHeader != null && !userIdHeader.isBlank()) {
+            return userIdHeader;
+        }
+
+        return null;
+    }
+
+    private String resolveUserRole(HttpServletRequest request) {
+        String userRole = (String) request.getAttribute("userRole");
+        if (userRole != null && !userRole.isBlank()) {
+            return userRole;
+        }
+
+        String userRoleHeader = request.getHeader("X-User-Role");
+        if (userRoleHeader != null && !userRoleHeader.isBlank()) {
+            return userRoleHeader;
+        }
+
+        String userRolesHeader = request.getHeader("X-User-Roles");
+        if (userRolesHeader != null && !userRolesHeader.isBlank()) {
+            String[] roles = userRolesHeader.split(",");
+            if (roles.length > 0) {
+                String firstRole = roles[0].trim();
+                if (!firstRole.isBlank()) {
+                    return firstRole;
+                }
+            }
+        }
+
+        return null;
     }
 }
