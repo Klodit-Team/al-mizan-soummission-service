@@ -21,6 +21,6 @@ jobs:
             echo "🚀 Starting Deployment for soumission-service..."
             cd ~/soumission-service
             git pull
-            cd ~/al-mizan-deployment
-            sudo docker-compose up -d --build soumission-service
+            cd ~/al-mizan-deployments
+            docker compose up -d --build soumission-service
             echo "✅ Deployment Successful!"
