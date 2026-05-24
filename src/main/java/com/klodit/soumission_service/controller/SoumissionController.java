@@ -84,7 +84,7 @@ public class SoumissionController {
             @PathVariable String aoId,
             HttpServletRequest httpServletRequest) {
 
-        rbacGuard.requireRole(httpServletRequest, "MEMBRE_COMMISSION", "ADMIN", "CONTROLEUR");
+        rbacGuard.requireRole(httpServletRequest, "SERVICE_CONTRACTANT", "MEMBRE_COMMISSION", "ADMIN", "CONTROLEUR");
         List<SoumissionResponse> list = soumissionService.listerParAppelOffre(aoId);
         return ResponseEntity.ok(ApiResponse.ok(list));
     }
