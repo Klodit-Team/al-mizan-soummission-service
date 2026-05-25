@@ -30,10 +30,17 @@ public class CleChiffrementController {
          * si l'event a échoué.
          */
         @PostMapping("/{aoId}")
-        @Operation(summary = "Générer les clés pour un AO", description = "Génère une paire RSA-4096. La clé privée est fragmentée "
-                        + "en N parts Shamir distribuées aux membres de la commission.")
+        @Operation(summary = "Générer les clés pour un AO", description = "Génère manuellement une paire de clés RSA-4096 et fragmente la clé privée en N parts Shamir destinées aux membres de la commission d'ouverture des plis (fallback / administration).")
+        @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "Clés RSA-4096 et fragments Shamir générés avec succès."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Liste de membres de commission invalide ou déjà initialisée."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès interdit (rôle ADMIN requis)."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Appel d'offres introuvable.")
+        })
         public ResponseEntity<ApiResponse<CleChiffrementResponse>> genererCles(
+                        @io.swagger.v3.oas.annotations.Parameter(description = "UUID unique de l'Appel d'offres", required = true, schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", format = "uuid"))
                         @PathVariable String aoId,
+                        @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Liste des IDs des membres de la commission d'ouverture des plis", required = true)
                         @RequestBody List<String> membresCommission,
                         HttpServletRequest httpServletRequest) {
 
@@ -49,9 +56,14 @@ public class CleChiffrementController {
          * Accessible à l'opérateur économique avant de chiffrer son offre financière.
          */
         @GetMapping("/{aoId}/publique")
-        @Operation(summary = "Récupérer la clé publique", description = "Retourne la clé publique RSA-4096 PEM de l'AO. "
-                        + "Utilisée par l'opérateur pour chiffrer l'offre financière.")
+        @Operation(summary = "Récupérer la clé publique", description = "Retourne la clé publique RSA-4096 au format PEM d'un Appel d'Offres afin de permettre à l'opérateur de chiffrer son enveloppe financière.")
+        @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Clé publique RSA récupérée avec succès."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé (rôles autorisés: OPERATEUR_ECONOMIQUE, ADMIN)."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Clé publique ou Appel d'offres introuvable.")
+        })
         public ResponseEntity<ApiResponse<CleChiffrementResponse>> getClePublique(
+                        @io.swagger.v3.oas.annotations.Parameter(description = "UUID de l'Appel d'offres", required = true, schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", format = "uuid"))
                         @PathVariable String aoId,
                         HttpServletRequest httpServletRequest) {
 

@@ -35,11 +35,22 @@ public class OffreFinanciereController {
         @Operation(summary = "Déposer l'offre financière chiffrée", description = "Upload le ciphertext de l'offre financière. "
                         + "Le fichier doit être chiffré AES-256-GCM + RSA-4096 avant envoi. "
                         + "La signature ECDSA P-384 garantit la non-répudiation.")
+        @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "L'offre financière chiffrée a été enregistrée avec succès."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Signature ECDSA invalide, clé publique mal formée ou fichier manquant."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès interdit (rôle OPERATEUR_ECONOMIQUE requis)."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Soumission d'offre introuvable.")
+        })
         public ResponseEntity<ApiResponse<OffreFinanciereResponse>> deposer(
+                        @io.swagger.v3.oas.annotations.Parameter(description = "UUID unique de la soumission d'offre", required = true, schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", format = "uuid"))
                         @PathVariable String soumissionId,
+                        @io.swagger.v3.oas.annotations.Parameter(description = "Le scan physique ou archive chiffrée de l'offre financière", required = true)
                         @RequestParam("fichierChiffre") MultipartFile fichierChiffre,
+                        @io.swagger.v3.oas.annotations.Parameter(description = "Hash SHA-256 du fichier calculé par le client (optionnel)", required = false)
                         @RequestParam(value = "hashClient", required = false) String hashClient,
+                        @io.swagger.v3.oas.annotations.Parameter(description = "Signature cryptographique ECDSA P-384 assurant l'intégrité et la non-répudiation", required = true)
                         @RequestParam("signatureEcdsa") String signatureEcdsa,
+                        @io.swagger.v3.oas.annotations.Parameter(description = "Clé publique ECDSA au format PEM pour valider la signature", required = true)
                         @RequestParam("clePubliqueEcdsaPem") String clePubliqueEcdsaPem,
                         HttpServletRequest httpServletRequest) {
 
@@ -59,7 +70,13 @@ public class OffreFinanciereController {
          */
         @GetMapping("/api/v1/soumissions/{soumissionId}/offre-financiere")
         @Operation(summary = "Consulter l'offre financière", description = "Les montants ne sont visibles qu'après ouverture des plis.")
+        @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Détails de l'offre financière récupérés avec succès."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé (rôles requis: OPERATEUR_ECONOMIQUE, MEMBRE_COMMISSION, ADMIN, CONTROLEUR)."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Offre financière ou soumission introuvable.")
+        })
         public ResponseEntity<ApiResponse<OffreFinanciereResponse>> getOffreFinanciere(
+                        @io.swagger.v3.oas.annotations.Parameter(description = "UUID unique de la soumission d'offre", required = true, schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", format = "uuid"))
                         @PathVariable String soumissionId,
                         HttpServletRequest httpServletRequest) {
 
@@ -81,8 +98,16 @@ public class OffreFinanciereController {
         @Operation(summary = "Déchiffrer les offres (ouverture des plis)", description = "Reconstitue la clé privée RSA via K fragments Shamir, "
                         + "déchiffre les PDF des offres financières, les stocke en clair dans MinIO "
                         + "et envoie une demande OCR au Service IA pour extraction des montants.")
+        @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Offres financières déchiffrées avec succès. Lance l'analyse OCR."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Nombre de fragments insuffisant pour atteindre le seuil de reconstruction Shamir ou fragments corrompus."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Opération interdite (rôle MEMBRE_COMMISSION requis)."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Appel d'offres ou clés de chiffrement introuvables.")
+        })
         public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> dechiffrer(
+                        @io.swagger.v3.oas.annotations.Parameter(description = "UUID unique de l'appel d'offres", required = true, schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", format = "uuid"))
                         @PathVariable String aoId,
+                        @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Dictionnaire contenant les fragments Shamir des membres de la commission (ID membre -> fragment)", required = true)
                         @Valid @RequestBody DechiffrementRequest request,
                         HttpServletRequest httpServletRequest) {
 

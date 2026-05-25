@@ -34,10 +34,19 @@ public class CautionController {
      * manuellement.
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Joindre la caution bancaire", description = "Ajoute le scan de la caution bancaire avec ses métadonnées")
+    @Operation(summary = "Joindre la caution bancaire", description = "Permet de joindre le justificatif bancaire (scan PDF/image) et ses métadonnées à une soumission existante.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "La caution bancaire a été enregistrée avec succès."),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Données JSON incorrectes, montant invalide ou scan manquant."),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Opération non autorisée (rôle OPERATEUR_ECONOMIQUE requis)."),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Soumission d'offre introuvable.")
+    })
     public ResponseEntity<ApiResponse<CautionResponse>> ajouterCaution(
+            @io.swagger.v3.oas.annotations.Parameter(description = "UUID unique de la soumission d'offre", required = true, schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", format = "uuid"))
             @PathVariable String soumissionId,
+            @io.swagger.v3.oas.annotations.Parameter(description = "Métadonnées JSON de la caution (CreateCautionRequest) sous forme de chaîne de caractères", required = true)
             @RequestPart("donnees") String donneesJson,
+            @io.swagger.v3.oas.annotations.Parameter(description = "Le scan physique (PDF/image) de la caution bancaire", required = true)
             @RequestPart("scanCaution") MultipartFile scanCaution,
             HttpServletRequest httpServletRequest) {
 
@@ -63,8 +72,14 @@ public class CautionController {
      * Accessible au propriétaire ou à la commission/admin/contrôleur.
      */
     @GetMapping
-    @Operation(summary = "Consulter la caution", description = "Retourne les informations de la caution bancaire")
+    @Operation(summary = "Consulter la caution", description = "Retourne les informations détaillées de la caution bancaire d'une soumission.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Informations de la caution récupérées avec succès."),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé pour cet utilisateur (rôles requis: OPERATEUR_ECONOMIQUE, MEMBRE_COMMISSION, ADMIN, CONTROLEUR)."),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Caution ou soumission introuvable.")
+    })
     public ResponseEntity<ApiResponse<CautionResponse>> getCaution(
+            @io.swagger.v3.oas.annotations.Parameter(description = "UUID unique de la soumission d'offre", required = true, schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", format = "uuid"))
             @PathVariable String soumissionId,
             HttpServletRequest httpServletRequest) {
 

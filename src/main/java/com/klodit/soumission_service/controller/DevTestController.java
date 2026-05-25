@@ -65,10 +65,19 @@ public class DevTestController {
         @Operation(summary = "[DEV] Générer une offre financière réellement chiffrée", description = "Remplace le fichier chiffré de l'offre par un fichier correctement "
                         + "chiffré avec la clé RSA de l'AO. Utilisé pour tester le déchiffrement. "
                         + "Le contenu est un faux PDF simulé pour les tests.")
+        @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Enveloppe financière chiffrée simulée générée et enregistrée dans MinIO avec succès."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Données d'entrées incorrectes ou clé publique RSA introuvable."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Soumission, offre financière existante ou clés de chiffrement de l'AO introuvables.")
+        })
         public ResponseEntity<ApiResponse<Map<String, Object>>> genererOffreChiffree(
+                        @io.swagger.v3.oas.annotations.Parameter(description = "UUID unique de la soumission cible", required = true, schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", format = "uuid"))
                         @PathVariable String soumissionId,
+                        @io.swagger.v3.oas.annotations.Parameter(description = "Montant Hors Taxes à écrire dans le PDF fictif", schema = @io.swagger.v3.oas.annotations.media.Schema(defaultValue = "1500000.00"))
                         @RequestParam(defaultValue = "1500000.00") String montantHt,
+                        @io.swagger.v3.oas.annotations.Parameter(description = "Montant de la TVA à écrire dans le PDF fictif", schema = @io.swagger.v3.oas.annotations.media.Schema(defaultValue = "285000.00"))
                         @RequestParam(defaultValue = "285000.00") String tva,
+                        @io.swagger.v3.oas.annotations.Parameter(description = "Montant Toutes Taxes Comprises à écrire dans le PDF fictif", schema = @io.swagger.v3.oas.annotations.media.Schema(defaultValue = "1785000.00"))
                         @RequestParam(defaultValue = "1785000.00") String montantTtc) {
 
                 // 1. Récupérer la soumission

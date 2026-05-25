@@ -30,12 +30,19 @@ public class OffreTechniqueController {
          * - hashClient : (optionnel) hash SHA-256 calculé côté client
          */
         @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-        @Operation(summary = "Déposer l'offre technique", description = "Upload le fichier de l'offre technique. " +
-                        "Un hash SHA-256 est calculé côté serveur. " +
-                        "L'analyse OCR est déclenchée automatiquement (Service IA).")
+        @Operation(summary = "Déposer l'offre technique", description = "Permet de déposer le scan physique de l'offre technique (PDF/ZIP, max 50 Mo). Calcule son hash SHA-256 côté serveur et lance l'analyse OCR automatique pour valider la conformité des pièces.")
+        @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "Offre technique déposée et analyse OCR en cours."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Fichier manquant, format non autorisé ou taille limite dépassée."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Opération interdite (rôle OPERATEUR_ECONOMIQUE requis)."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Soumission d'offre introuvable.")
+        })
         public ResponseEntity<ApiResponse<OffreTechniqueResponse>> deposer(
+                        @io.swagger.v3.oas.annotations.Parameter(description = "UUID unique de la soumission d'offre", required = true, schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", format = "uuid"))
                         @PathVariable String soumissionId,
+                        @io.swagger.v3.oas.annotations.Parameter(description = "Le fichier physique de l'offre technique (PDF ou archive ZIP)", required = true)
                         @RequestParam("fichier") MultipartFile fichier,
+                        @io.swagger.v3.oas.annotations.Parameter(description = "Hash SHA-256 calculé côté client (optionnel)", required = false)
                         @RequestParam(value = "hashClient", required = false) String hashClient,
                         HttpServletRequest httpServletRequest) {
 
@@ -53,8 +60,14 @@ public class OffreTechniqueController {
          * Accessible au propriétaire ou à la commission/admin/contrôleur.
          */
         @GetMapping
-        @Operation(summary = "Consulter l'offre technique", description = "Retourne les métadonnées de l'offre technique (hash, conformité OCR)")
+        @Operation(summary = "Consulter l'offre technique", description = "Retourne les métadonnées de l'offre technique rattachée à une soumission (ex: hash de fichier, conformité OCR, URL de scan).")
+        @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Métadonnées de l'offre technique récupérées avec succès."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé (rôles autorisés: OPERATEUR_ECONOMIQUE, MEMBRE_COMMISSION, ADMIN, CONTROLEUR)."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Offre technique ou soumission introuvable.")
+        })
         public ResponseEntity<ApiResponse<OffreTechniqueResponse>> getOffreTechnique(
+                        @io.swagger.v3.oas.annotations.Parameter(description = "UUID unique de la soumission d'offre", required = true, schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", format = "uuid"))
                         @PathVariable String soumissionId,
                         HttpServletRequest httpServletRequest) {
 
