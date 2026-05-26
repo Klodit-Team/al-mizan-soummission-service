@@ -2,6 +2,9 @@ package com.klodit.soumission_service.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.klodit.soumission_service.dto.request.CreateSoumissionRequest;
+import com.klodit.soumission_service.entity.LigneOffreFinanciere;
+import com.klodit.soumission_service.repository.LigneOffreFinanciereRepository;
+import com.klodit.soumission_service.repository.SoumissionRepository;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -36,6 +39,15 @@ class SoumissionFlowIntegrationTest extends AbstractIntegrationTest {
         @Autowired
         private ObjectMapper objectMapper;
 
+        @Autowired
+        private SoumissionRepository soumissionRepository;
+
+        @Autowired
+        private LigneOffreFinanciereRepository ligneOffreFinanciereRepository;
+
+        @Autowired
+        private org.springframework.transaction.support.TransactionTemplate transactionTemplate;
+
         private static final String OPERATOR_ID = "op-integration-test-001";
         private static final String AO_ID = "ao-integration-test-001";
         private static final String LOT_ID = "lot-integration-test-001";
@@ -43,6 +55,23 @@ class SoumissionFlowIntegrationTest extends AbstractIntegrationTest {
 
         // Stocké entre les tests (attention : @TestMethodOrder requis)
         private static String soumissionId;
+        private static String articleId;
+
+        private static boolean isCleaned = false;
+
+        @BeforeEach
+        void setUp() {
+                if (!isCleaned) {
+                        transactionTemplate.executeWithoutResult(status -> {
+                                java.util.List<com.klodit.soumission_service.entity.Soumission> soumissions = soumissionRepository.findByAppelOffreIdOrderByCreatedAtDesc(AO_ID);
+                                for (com.klodit.soumission_service.entity.Soumission soumission : soumissions) {
+                                        ligneOffreFinanciereRepository.deleteBySoumissionId(soumission.getId());
+                                        soumissionRepository.delete(soumission);
+                                }
+                        });
+                        isCleaned = true;
+                }
+        }
 
         @Test
         @Order(1)
@@ -74,6 +103,18 @@ class SoumissionFlowIntegrationTest extends AbstractIntegrationTest {
                 soumissionId = (String) data.get("id");
 
                 assertThat(soumissionId).isNotNull().isNotBlank();
+
+                // Pré-populer une ligne de BPU pour cette soumission dans l'intégration
+                LigneOffreFinanciere line = LigneOffreFinanciere.builder()
+                                .soumission(soumissionRepository.findById(soumissionId).get())
+                                .designation("Lot de test")
+                                .quantite(java.math.BigDecimal.ONE)
+                                .unite("LOT")
+                                .prixUnitaire(null)
+                                .build();
+                LigneOffreFinanciere savedLine = ligneOffreFinanciereRepository.save(line);
+                articleId = savedLine.getId();
+                assertThat(articleId).isNotNull().isNotBlank();
         }
 
         @Test
@@ -108,16 +149,14 @@ class SoumissionFlowIntegrationTest extends AbstractIntegrationTest {
                                 "Attestation de caution bancaire de test".getBytes());
 
                 String cautionJson = objectMapper.writeValueAsString(Map.of(
-                                "montant", 500000.00,
-                                "banque", "BNA",
+                                "compteBancaireId", "rib-integration-001",
                                 "reference", "CAUT-2025-001",
-                                "dateEmission", "2026-01-15T00:00:00",
                                 "dateExpiration", "2027-07-15T00:00:00"));
 
                 MockMultipartFile donnees = new MockMultipartFile(
                                 "donnees",
                                 "",
-                                "text/plain",
+                                "application/json",
                                 cautionJson.getBytes());
 
                 mockMvc.perform(multipart(BASE_URL + "/soumissions/{id}/caution", soumissionId)
@@ -143,11 +182,23 @@ class SoumissionFlowIntegrationTest extends AbstractIntegrationTest {
                                 "application/octet-stream",
                                 "Contenu chiffré de l'offre financière".getBytes());
 
+                String requestJson = objectMapper.writeValueAsString(Map.of(
+                                "signatureEcdsa", "dummySignature==",
+                                "clePubliqueEcdsaPem", "-----BEGIN PUBLIC KEY-----\nMHYwEAYHKoZIzj0CAQYFK4EEACIDYgAE\n-----END PUBLIC KEY-----",
+                                "lignes", java.util.List.of(
+                                                 Map.of("articleId", articleId, "prixUnitaire", 1000.00)
+                                )
+                ));
+
+                MockMultipartFile donnees = new MockMultipartFile(
+                                "donnees",
+                                "",
+                                "application/json",
+                                requestJson.getBytes());
+
                 mockMvc.perform(multipart(BASE_URL + "/soumissions/{id}/offre-financiere", soumissionId)
                                 .file(fichier)
-                                .param("signatureEcdsa", "dummySignature==")
-                                .param("clePubliqueEcdsaPem",
-                                                "-----BEGIN PUBLIC KEY-----\nMHYwEAYHKoZIzj0CAQYFK4EEACIDYgAE\n-----END PUBLIC KEY-----")
+                                .file(donnees)
                                 .header("X-User-Id", OPERATOR_ID)
                                 .header("X-User-Role", "OPERATEUR_ECONOMIQUE")
                                 .requestAttr("userId", OPERATOR_ID)

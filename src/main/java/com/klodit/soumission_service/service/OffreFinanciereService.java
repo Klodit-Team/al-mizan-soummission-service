@@ -1,11 +1,14 @@
 package com.klodit.soumission_service.service;
 
 import com.klodit.soumission_service.config.MinIOProperties;
+import com.klodit.soumission_service.dto.request.DepotOffreFinanciereRequest;
 import com.klodit.soumission_service.dto.response.OffreFinanciereResponse;
+import com.klodit.soumission_service.entity.LigneOffreFinanciere;
 import com.klodit.soumission_service.entity.OffreFinanciere;
 import com.klodit.soumission_service.entity.Soumission;
 import com.klodit.soumission_service.enums.StatutSoumission;
 import com.klodit.soumission_service.exception.*;
+import com.klodit.soumission_service.repository.LigneOffreFinanciereRepository;
 import com.klodit.soumission_service.repository.OffreFinanciereRepository;
 import com.klodit.soumission_service.repository.SoumissionRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +29,7 @@ public class OffreFinanciereService {
 
     private final SoumissionRepository soumissionRepository;
     private final OffreFinanciereRepository offreFinanciereRepository;
+    private final LigneOffreFinanciereRepository ligneOffreFinanciereRepository;
     private final MinIOService minIOService;
     private final HashService hashService;
     private final ChiffrementService chiffrementService;
@@ -38,21 +42,15 @@ public class OffreFinanciereService {
      * Le serveur vérifie la signature ECDSA P-384, stocke le ciphertext
      * et calcule son hash d'intégrité (CSL §4.4.5, Table 4.11 étape 4).
      *
-     * @param soumissionId        ID de la soumission
-     * @param operateurId         ID de l'opérateur économique
-     * @param fichierChiffre      fichier chiffré (ciphertext)
-     * @param hashClient          hash SHA-256 du ciphertext calculé côté client
-     *                            (optionnel)
-     * @param signatureEcdsa      signature ECDSA P-384 (Base64) sur le hash du
-     *                            ciphertext
-     * @param clePubliqueEcdsaPem clé publique ECDSA P-384 PEM de l'opérateur
-     *                            économique
+     * @param soumissionId   ID de la soumission
+     * @param operateurId    ID de l'opérateur économique
+     * @param fichierChiffre fichier chiffré (ciphertext)
+     * @param request        le DTO DepotOffreFinanciereRequest contenant les lignes du BPU, la signature, la clé publique et le hash client
      */
     @Transactional
     public OffreFinanciereResponse deposerOffreFinanciere(
             String soumissionId, String operateurId,
-            MultipartFile fichierChiffre, String hashClient,
-            String signatureEcdsa, String clePubliqueEcdsaPem) {
+            MultipartFile fichierChiffre, DepotOffreFinanciereRequest request) {
 
         // 1. Charger et valider la soumission
         Soumission soumission = soumissionRepository.findById(soumissionId)
@@ -68,32 +66,76 @@ public class OffreFinanciereService {
                     "L'offre financière ne peut être déposée qu'en statut BROUILLON");
         }
 
-        // 2. Vérifier qu'aucune offre financière n'a déjà été déposée
+        // 2. Validation stricte du payload
+        if (request.getLignes() == null || request.getLignes().isEmpty()) {
+            throw new FichierInvalideException("Les lignes de l'offre financière sont obligatoires");
+        }
+
+        for (DepotOffreFinanciereRequest.LigneOffreRequest item : request.getLignes()) {
+            if (item.getDesignation() != null || item.getQuantite() != null || item.getUnite() != null) {
+                throw new FichierInvalideException(
+                        "Interdiction formelle de modifier ou de renseigner les colonnes relatives aux désignations, quantités et unités.");
+            }
+        }
+
+        // 3. Charger les lignes de BPU pré-remplies en base
+        List<LigneOffreFinanciere> lignesDb = ligneOffreFinanciereRepository.findBySoumissionId(soumissionId);
+        if (lignesDb.isEmpty()) {
+            throw new FichierInvalideException("Aucun BPU pré-rempli trouvé pour cette soumission.");
+        }
+
+        // Vérifier que le nombre d'éléments correspond
+        if (request.getLignes().size() != lignesDb.size()) {
+            throw new FichierInvalideException("La structure du BPU soumis est différente de la structure originale (nombre de lignes incorrect).");
+        }
+
+        // Mapper les IDs pour vérification d'exactitude
+        java.util.Map<String, LigneOffreFinanciere> mapDb = lignesDb.stream()
+                .collect(java.util.stream.Collectors.toMap(LigneOffreFinanciere::getId, l -> l));
+
+        java.math.BigDecimal totalHt = java.math.BigDecimal.ZERO;
+
+        for (DepotOffreFinanciereRequest.LigneOffreRequest item : request.getLignes()) {
+            LigneOffreFinanciere ligneDb = mapDb.get(item.getArticleId());
+            if (ligneDb == null) {
+                throw new FichierInvalideException("L'article ID " + item.getArticleId() + " ne correspond à aucune ligne originale du BPU.");
+            }
+            // Enregistrer le prix unitaire
+            ligneDb.setPrixUnitaire(item.getPrixUnitaire());
+            ligneOffreFinanciereRepository.save(ligneDb);
+
+            // Calculer montant HT de la ligne (prix * quantite)
+            java.math.BigDecimal ligneMontant = item.getPrixUnitaire().multiply(ligneDb.getQuantite());
+            totalHt = totalHt.add(ligneMontant);
+        }
+
+        // 4. Vérifier qu'aucune offre financière n'a déjà été déposée
         offreFinanciereRepository.findBySoumissionId(soumissionId).ifPresent(of -> {
             throw new OffreDejaDeposeeException("offre financière");
         });
 
+        // 5. Calculer les montants globaux
+        java.math.BigDecimal tvaRate = new java.math.BigDecimal("0.19"); // TVA 19% par défaut
+        java.math.BigDecimal tvaMontant = totalHt.multiply(tvaRate);
+        java.math.BigDecimal totalTtc = totalHt.add(tvaMontant);
+
         try {
-            // 3. Calculer le hash SHA-256 du CIPHERTEXT (pas du plaintext)
+            // 6. Calculer le hash SHA-256 du CIPHERTEXT (pas du plaintext)
             String hashServeur = hashService.calculerHash(fichierChiffre);
 
+            String hashClient = request.getHashClient();
             if (hashClient != null && !hashClient.isBlank()
                     && !hashServeur.equalsIgnoreCase(hashClient)) {
                 log.warn("Hash ciphertext client ≠ serveur pour soumission {}. " +
                         "Client: {}, Serveur: {}", soumissionId, hashClient, hashServeur);
             }
 
-            // 4. Vérifier la signature ECDSA P-384 (non-répudiation — CSL §4.4.5 Table 4.11
-            // étape 4)
-            // Note : la vérification est best-effort côté serveur.
-            // La clé et la signature sont stockées pour vérification formelle ultérieure
-            // (ouverture des plis / audit). En cas de clé malformée (ex: PEM tronqué
-            // via query param), on log un warning mais on accepte le dépôt.
+            // 7. Vérifier la signature ECDSA P-384
             boolean signatureVerifiee = false;
             try {
                 java.security.PublicKey clePubliqueEcdsa = chiffrementService
-                        .reconstruireClePubliqueECDSA(clePubliqueEcdsaPem);
-                byte[] signatureBytes = java.util.Base64.getDecoder().decode(signatureEcdsa);
+                        .reconstruireClePubliqueECDSA(request.getClePubliqueEcdsaPem());
+                byte[] signatureBytes = java.util.Base64.getDecoder().decode(request.getSignatureEcdsa());
                 byte[] hashBytes = hashServeur.getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
                 signatureVerifiee = chiffrementService.verifierSignatureECDSA(
@@ -110,28 +152,30 @@ public class OffreFinanciereService {
                         soumissionId, ecdsaEx.getMessage());
             }
 
-            // 5. Upload du ciphertext vers MinIO (bucket sécurisé)
+            // 8. Upload du ciphertext vers MinIO (bucket sécurisé)
             String bucket = minIOProperties.getBucket().getOffresFinancieres();
             String fichierUrl = minIOService.uploadFichier(fichierChiffre, bucket, soumissionId);
 
-            // 6. Persister l'offre financière (chiffrée, sans montant — sera rempli à
-            // l'ouverture)
+            // 9. Persister l'offre financière
             OffreFinanciere offreFinanciere = OffreFinanciere.builder()
                     .soumission(soumission)
                     .fichierChiffreUrl(fichierUrl)
                     .hashFichier(hashServeur)
-                    .signatureEcdsa(signatureEcdsa)
-                    .clePubliqueEcdsa(clePubliqueEcdsaPem)
+                    .signatureEcdsa(request.getSignatureEcdsa())
+                    .clePubliqueEcdsa(request.getClePubliqueEcdsaPem())
                     .isDechiffree(false)
+                    .montantHt(totalHt)
+                    .tva(tvaMontant)
+                    .montantTtc(totalTtc)
                     .build();
 
             offreFinanciere = offreFinanciereRepository.save(offreFinanciere);
-            log.info("Offre financière (chiffrée) enregistrée — ID: {}", offreFinanciere.getId());
+            log.info("Offre financière (chiffrée) enregistrée — ID: {}, Montant HT: {}", offreFinanciere.getId(), totalHt);
 
-            // 7. Log d'audit
+            // 10. Log d'audit
             auditLogService.logDepot(soumissionId, operateurId,
                     "OFFRE_FINANCIERE", true,
-                    "Ciphertext hashé: " + hashServeur);
+                    "Ciphertext hashé: " + hashServeur + " | Montant HT: " + totalHt);
 
             return toResponse(offreFinanciere);
 

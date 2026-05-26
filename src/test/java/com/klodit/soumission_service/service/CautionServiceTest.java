@@ -20,7 +20,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -60,11 +59,9 @@ class CautionServiceTest {
                 .build();
 
         request = CreateCautionRequest.builder()
-                .montant(new BigDecimal("500000"))
-                .banque("BNA")
-                .reference("CB-2025-001")
-                .dateEmission(LocalDateTime.of(2025, 1, 1, 0, 0))
-                .dateExpiration(LocalDateTime.of(2027, 12, 31, 23, 59))
+                .compteBancaireId("rib-123456789")
+                .reference("CB-2026-001")
+                .dateExpiration(LocalDateTime.now().plusYears(1))
                 .build();
 
         scanFile = new MockMultipartFile(
@@ -99,8 +96,8 @@ class CautionServiceTest {
                     "soum-001", "op-001", request, scanFile);
 
             assertThat(result).isNotNull();
-            assertThat(result.getBanque()).isEqualTo("BNA");
-            assertThat(result.getMontant()).isEqualByComparingTo("500000");
+            assertThat(result.getCompteBancaireId()).isEqualTo("rib-123456789");
+            assertThat(result.getReference()).isEqualTo("CB-2026-001");
             assertThat(result.getStatut()).isEqualTo(StatutCaution.VALIDE);
 
             verify(cautionRepository).save(any(Caution.class));
@@ -152,23 +149,9 @@ class CautionServiceTest {
         }
 
         @Test
-        @DisplayName("Date expiration avant émission → FichierInvalideException")
-        void dateExpirationAvantEmission() {
-            request.setDateExpiration(LocalDateTime.of(2024, 1, 1, 0, 0)); // avant emission
-            when(soumissionRepository.findById("soum-001")).thenReturn(Optional.of(soumission));
-            when(cautionRepository.findBySoumissionId("soum-001")).thenReturn(Optional.empty());
-
-            assertThatThrownBy(() -> cautionService.ajouterCaution(
-                    "soum-001", "op-001", request, scanFile))
-                    .isInstanceOf(FichierInvalideException.class)
-                    .hasMessageContaining("postérieure");
-        }
-
-        @Test
         @DisplayName("Date expiration déjà passée → FichierInvalideException")
         void dateExpirationPassee() {
-            request.setDateEmission(LocalDateTime.of(2020, 1, 1, 0, 0));
-            request.setDateExpiration(LocalDateTime.of(2021, 1, 1, 0, 0)); // passée
+            request.setDateExpiration(LocalDateTime.now().minusDays(1)); // passée
             when(soumissionRepository.findById("soum-001")).thenReturn(Optional.of(soumission));
             when(cautionRepository.findBySoumissionId("soum-001")).thenReturn(Optional.empty());
 
@@ -191,11 +174,9 @@ class CautionServiceTest {
             Caution caution = Caution.builder()
                     .id("cau-001")
                     .soumission(soumission)
-                    .montant(new BigDecimal("500000"))
-                    .banque("BNA")
+                    .compteBancaireId("rib-123456789")
                     .reference("CB-001")
-                    .dateEmission(LocalDateTime.of(2025, 1, 1, 0, 0))
-                    .dateExpiration(LocalDateTime.of(2027, 12, 31, 23, 59))
+                    .dateExpiration(LocalDateTime.now().plusYears(1))
                     .statut(StatutCaution.VALIDE)
                     .fichierUrl("cautions/soum-001/file.pdf")
                     .build();
@@ -206,7 +187,7 @@ class CautionServiceTest {
             CautionResponse result = cautionService.getCaution("soum-001");
 
             assertThat(result.getId()).isEqualTo("cau-001");
-            assertThat(result.getBanque()).isEqualTo("BNA");
+            assertThat(result.getCompteBancaireId()).isEqualTo("rib-123456789");
             assertThat(result.getStatut()).isEqualTo(StatutCaution.VALIDE);
         }
 

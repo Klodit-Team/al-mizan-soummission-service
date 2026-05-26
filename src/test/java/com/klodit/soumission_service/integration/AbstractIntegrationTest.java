@@ -23,62 +23,62 @@ import org.testcontainers.utility.DockerImageName;
  * toutes les classes de tests d'intégration.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SuppressWarnings("resource")
 public abstract class AbstractIntegrationTest {
 
         // ── MySQL 8 ────────────────────────────────────────────
-        static final MySQLContainer<?> mysql = new MySQLContainer<>(
-                        DockerImageName.parse("mysql:8.0"))
-                        .withDatabaseName("soumission_db")
-                        .withUsername("test")
-                        .withPassword("test")
-                        .withInitScript("init-test.sql");
+        static final MySQLContainer<?> mysql = new MySQLContainer<>(DockerImageName.parse("mysql:8.0"));
 
         // ── RabbitMQ ───────────────────────────────────────────
-        static final RabbitMQContainer rabbitmq = new RabbitMQContainer(
-                        DockerImageName.parse("rabbitmq:3-management"));
+        static final RabbitMQContainer rabbitmq = new RabbitMQContainer(DockerImageName.parse("rabbitmq:3-management"));
 
         // ── MinIO (S3-compatible) ──────────────────────────────
-        static final GenericContainer<?> minio = new GenericContainer<>(
-                        DockerImageName.parse("minio/minio:latest"))
-                        .withExposedPorts(9000)
-                        .withEnv("MINIO_ROOT_USER", "minioadmin")
-                        .withEnv("MINIO_ROOT_PASSWORD", "minioadmin")
-                        .withCommand("server /data");
+        static final GenericContainer<?> minio = new GenericContainer<>(DockerImageName.parse("minio/minio:latest"));
 
         // ── Redis ──────────────────────────────────────────────
-        static final GenericContainer<?> redis = new GenericContainer<>(
-                        DockerImageName.parse("redis:7-alpine"))
-                        .withExposedPorts(6379);
+        static final GenericContainer<?> redis = new GenericContainer<>(DockerImageName.parse("redis:7-alpine"));
 
         static {
-                mysql.start();
-                rabbitmq.start();
-                minio.start();
-                redis.start();
+                mysql.withDatabaseName("soumission_db")
+                                .withUsername("test")
+                                .withPassword("test")
+                                .withInitScript("init-test.sql");
+
+                minio.withExposedPorts(9000)
+                                .withEnv("MINIO_ROOT_USER", "minioadmin")
+                                .withEnv("MINIO_ROOT_PASSWORD", "minioadmin")
+                                .withCommand("server /data");
+
+                redis.withExposedPorts(6379);
+
+                // mysql.start();
+                // rabbitmq.start();
+                // minio.start();
+                // redis.start();
         }
 
         @DynamicPropertySource
         static void configureProperties(DynamicPropertyRegistry registry) {
-                // MySQL
-                registry.add("spring.datasource.url", mysql::getJdbcUrl);
-                registry.add("spring.datasource.username", mysql::getUsername);
-                registry.add("spring.datasource.password", mysql::getPassword);
-                registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
+                // MySQL (using active local container)
+                registry.add("spring.datasource.url", () -> "jdbc:mysql://localhost:3306/soumission_db?useSSL=false&allowPublicKeyRetrieval=true");
+                registry.add("spring.datasource.username", () -> "root");
+                registry.add("spring.datasource.password", () -> "password");
+                registry.add("spring.jpa.hibernate.ddl-auto", () -> "update");
 
-                // RabbitMQ
-                registry.add("spring.rabbitmq.host", rabbitmq::getHost);
-                registry.add("spring.rabbitmq.port", rabbitmq::getAmqpPort);
+                // RabbitMQ (using active local container)
+                registry.add("spring.rabbitmq.host", () -> "localhost");
+                registry.add("spring.rabbitmq.port", () -> 5672);
                 registry.add("spring.rabbitmq.username", () -> "guest");
                 registry.add("spring.rabbitmq.password", () -> "guest");
 
-                // MinIO
-                registry.add("minio.endpoint", () -> "http://" + minio.getHost() + ":" + minio.getMappedPort(9000));
+                // MinIO (using active local container)
+                registry.add("minio.endpoint", () -> "http://localhost:9000");
                 registry.add("minio.access-key", () -> "minioadmin");
                 registry.add("minio.secret-key", () -> "minioadmin");
 
-                // Redis
-                registry.add("spring.data.redis.host", redis::getHost);
-                registry.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
+                // Redis (using active local container)
+                registry.add("spring.data.redis.host", () -> "localhost");
+                registry.add("spring.data.redis.port", () -> 6379);
 
                 // Activer le fallback dev pour les tests d'intégration (headers
                 // X-User-Id/X-User-Role)

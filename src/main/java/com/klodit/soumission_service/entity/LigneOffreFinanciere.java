@@ -1,46 +1,41 @@
 package com.klodit.soumission_service.entity;
 
-import com.klodit.soumission_service.enums.StatutCaution;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.UuidGenerator;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "cautions")
+@Table(name = "ligne_offres_financieres")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Caution {
+public class LigneOffreFinanciere {
 
     @Id
     @UuidGenerator
     @Column(length = 36)
     private String id;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "soumission_id", nullable = false)
     private Soumission soumission;
 
-    @Column(name = "compte_bancaire_id", nullable = false, length = 100)
-    private String compteBancaireId;
-
-    @Column(nullable = false, length = 100)
-    private String reference;
-
-    @Column(name = "date_expiration", nullable = false)
-    private LocalDateTime dateExpiration;
-
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    @Builder.Default
-    private StatutCaution statut = StatutCaution.VALIDE;
+    private String designation;
 
-    @Column(name = "fichier_url", nullable = false, length = 500)
-    private String fichierUrl;
+    @Column(nullable = false, precision = 15, scale = 2)
+    private BigDecimal quantite;
+
+    @Column(nullable = false)
+    private String unite;
+
+    @Column(name = "prix_unitaire", precision = 15, scale = 2)
+    private BigDecimal prixUnitaire;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
