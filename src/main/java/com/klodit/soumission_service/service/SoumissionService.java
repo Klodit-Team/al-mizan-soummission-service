@@ -3,9 +3,13 @@ package com.klodit.soumission_service.service;
 import com.klodit.soumission_service.client.AppelOffreClient;
 import com.klodit.soumission_service.client.DocumentsClient;
 import com.klodit.soumission_service.client.UtilisateurClient;
+import com.klodit.soumission_service.client.dto.AppelOffreExterneDTO;
+import com.klodit.soumission_service.client.dto.LotExterneDTO;
 import com.klodit.soumission_service.dto.request.CreateSoumissionRequest;
 import com.klodit.soumission_service.dto.response.SoumissionDetailResponse;
 import com.klodit.soumission_service.dto.response.SoumissionResponse;
+import com.klodit.soumission_service.dto.response.LigneOffreFinanciereResponse;
+import com.klodit.soumission_service.entity.LigneOffreFinanciere;
 import com.klodit.soumission_service.entity.Soumission;
 import com.klodit.soumission_service.enums.StatutSoumission;
 import com.klodit.soumission_service.exception.OffreDejaDeposeeException;
@@ -15,6 +19,7 @@ import com.klodit.soumission_service.messaging.event.SoumissionRecueEvent;
 import com.klodit.soumission_service.messaging.event.SoumissionStatutChangeEvent;
 import com.klodit.soumission_service.messaging.publisher.SoumissionEventPublisher;
 import com.klodit.soumission_service.repository.CautionRepository;
+import com.klodit.soumission_service.repository.LigneOffreFinanciereRepository;
 import com.klodit.soumission_service.repository.OffreFinanciereRepository;
 import com.klodit.soumission_service.repository.OffreTechniqueRepository;
 import com.klodit.soumission_service.repository.SoumissionRepository;
@@ -37,6 +42,7 @@ public class SoumissionService {
         private final OffreTechniqueRepository offreTechniqueRepository;
         private final OffreFinanciereRepository offreFinanciereRepository;
         private final CautionRepository cautionRepository;
+        private final LigneOffreFinanciereRepository ligneOffreFinanciereRepository;
         private final HorodatageService horodatageService;
         private final AuditLogService auditLogService;
         private final SoumissionEventPublisher eventPublisher;
@@ -59,8 +65,11 @@ public class SoumissionService {
                                 });
 
                 // Vérifier que l'AO existe et est en statut PUBLIE
-                if (!appelOffreClient.isAppelOffrePublie(request.getAppelOffreId())) {
-                        log.warn("Tentative de soumission sur AO non publié : {}", request.getAppelOffreId());
+                java.util.Optional<AppelOffreExterneDTO> aoOpt = appelOffreClient
+                                .getAppelOffre(request.getAppelOffreId());
+                if (aoOpt.isEmpty() || !"PUBLIE".equalsIgnoreCase(aoOpt.get().getStatut())) {
+                        log.warn("Tentative de soumission sur AO non existant ou non publié : {}",
+                                        request.getAppelOffreId());
                         // Dégradation gracieuse : si le service AO est indisponible, on autorise
                         // la création du brouillon car la vérification sera faite à la validation
                         // (US-5)
@@ -75,10 +84,41 @@ public class SoumissionService {
                                 .isElectronique(true)
                                 .build();
 
-                soumission = soumissionRepository.save(soumission);
-                log.info("Brouillon créé — ID: {}, Ref: {}", soumission.getId(), soumission.getReference());
+                final Soumission savedSoumission = soumissionRepository.save(soumission);
+                log.info("Brouillon créé — ID: {}, Ref: {}", savedSoumission.getId(), savedSoumission.getReference());
 
-                return toResponse(soumission);
+                // Pré-peuplage du BPU Financier
+                if (aoOpt.isPresent() && aoOpt.get().getLots() != null) {
+                        List<LotExterneDTO> lots = aoOpt.get().getLots();
+                        if (request.getLotId() != null) {
+                                // Filtrer le lot concerné par la soumission
+                                String targetLotId = request.getLotId();
+                                lots.stream()
+                                                .filter(lot -> targetLotId.equals(lot.getId()))
+                                                .findFirst()
+                                                .ifPresent(lot -> creerLigneBpu(savedSoumission, lot));
+                        } else {
+                                // Soumission globale : pré-charger tous les lots
+                                lots.forEach(lot -> creerLigneBpu(savedSoumission, lot));
+                        }
+                } else {
+                        log.warn("Pré-peuplage BPU impossible pour la soumission {} : Service AO indisponible ou aucun lot défini",
+                                        savedSoumission.getId());
+                }
+
+                return toResponse(savedSoumission);
+        }
+
+        private void creerLigneBpu(Soumission soumission, LotExterneDTO lot) {
+                LigneOffreFinanciere ligne = LigneOffreFinanciere.builder()
+                                .soumission(soumission)
+                                .designation(lot.getDesignation())
+                                .quantite(java.math.BigDecimal.ONE)
+                                .unite("LOT")
+                                .prixUnitaire(null)
+                                .build();
+                ligneOffreFinanciereRepository.save(ligne);
+                log.info("Ligne BPU pré-peuplée pour lot {} — ID Ligne: {}", lot.getId(), ligne.getId());
         }
 
         /**
@@ -314,6 +354,17 @@ public class SoumissionService {
         }
 
         private SoumissionDetailResponse toDetailResponse(Soumission s) {
+                List<LigneOffreFinanciereResponse> lignes = ligneOffreFinanciereRepository.findBySoumissionId(s.getId())
+                                .stream()
+                                .map(l -> LigneOffreFinanciereResponse.builder()
+                                                .id(l.getId())
+                                                .designation(l.getDesignation())
+                                                .quantite(l.getQuantite())
+                                                .unite(l.getUnite())
+                                                .prixUnitaire(l.getPrixUnitaire())
+                                                .build())
+                                .toList();
+
                 return SoumissionDetailResponse.builder()
                                 .id(s.getId())
                                 .appelOffreId(s.getAppelOffreId())
@@ -326,6 +377,7 @@ public class SoumissionService {
                                 .isDansDelai(s.getIsDansDelai())
                                 .createdAt(s.getCreatedAt())
                                 .updatedAt(s.getUpdatedAt())
+                                .lignesOffreFinanciere(lignes)
                                 // Sous-objets mappés si présents (lazy loading dans la transaction)
                                 .build();
         }

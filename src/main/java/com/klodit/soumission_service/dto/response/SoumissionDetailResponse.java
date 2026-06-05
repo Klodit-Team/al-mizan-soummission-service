@@ -4,6 +4,7 @@ import com.klodit.soumission_service.enums.StatutSoumission;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -27,4 +28,5 @@ public class SoumissionDetailResponse {
     private OffreTechniqueResponse offreTechnique;
     private OffreFinanciereResponse offreFinanciere;
     private CautionResponse caution;
+    private List<LigneOffreFinanciereResponse> lignesOffreFinanciere;
 }

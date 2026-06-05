@@ -55,10 +55,6 @@ public class CautionService {
         });
 
         // Valider les dates
-        if (request.getDateExpiration().isBefore(request.getDateEmission())) {
-            throw new FichierInvalideException(
-                    "La date d'expiration doit être postérieure à la date d'émission");
-        }
         if (request.getDateExpiration().isBefore(java.time.LocalDateTime.now())) {
             throw new FichierInvalideException(
                     "La date d'expiration de la caution est déjà passée");
@@ -71,21 +67,19 @@ public class CautionService {
 
             Caution caution = Caution.builder()
                     .soumission(soumission)
-                    .montant(request.getMontant())
-                    .banque(request.getBanque())
+                    .compteBancaireId(request.getCompteBancaireId())
                     .reference(request.getReference())
-                    .dateEmission(request.getDateEmission())
                     .dateExpiration(request.getDateExpiration())
                     .statut(StatutCaution.VALIDE)
                     .fichierUrl(fichierUrl)
                     .build();
 
             caution = cautionRepository.save(caution);
-            log.info("Caution enregistrée — ID: {}, banque: {}, montant: {}",
-                    caution.getId(), caution.getBanque(), caution.getMontant());
+            log.info("Caution enregistrée — ID: {}, compteBancaireId: {}, reference: {}",
+                    caution.getId(), caution.getCompteBancaireId(), caution.getReference());
 
             auditLogService.logDepot(soumissionId, operateurId, "CAUTION", true,
-                    "Banque: " + request.getBanque() + ", Réf: " + request.getReference());
+                    "Compte: " + request.getCompteBancaireId() + ", Réf: " + request.getReference());
 
             return toResponse(caution);
 
@@ -111,10 +105,8 @@ public class CautionService {
     private CautionResponse toResponse(Caution c) {
         return CautionResponse.builder()
                 .id(c.getId())
-                .montant(c.getMontant())
-                .banque(c.getBanque())
+                .compteBancaireId(c.getCompteBancaireId())
                 .reference(c.getReference())
-                .dateEmission(c.getDateEmission())
                 .dateExpiration(c.getDateExpiration())
                 .statut(c.getStatut())
                 .fichierUrl(c.getFichierUrl())

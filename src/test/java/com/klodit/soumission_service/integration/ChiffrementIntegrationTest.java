@@ -38,9 +38,28 @@ class ChiffrementIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private FragmentCleRepository fragmentCleRepository;
 
+    @Autowired
+    private org.springframework.transaction.support.TransactionTemplate transactionTemplate;
+
     private static final String AO_ID = "ao-chiffrement-test-001";
     private static final List<String> MEMBRES = List.of(
             "membre-1", "membre-2", "membre-3", "membre-4", "membre-5");
+
+    private static boolean isCleaned = false;
+
+    @BeforeEach
+    void setUp() {
+        if (!isCleaned) {
+            transactionTemplate.executeWithoutResult(status -> {
+                cleChiffrementRepository.findByAppelOffreId(AO_ID).ifPresent(cle -> {
+                    List<FragmentCle> fragments = fragmentCleRepository.findByCleChiffrementId(cle.getId());
+                    fragmentCleRepository.deleteAll(fragments);
+                    cleChiffrementRepository.delete(cle);
+                });
+            });
+            isCleaned = true;
+        }
+    }
 
     @Test
     @Order(1)

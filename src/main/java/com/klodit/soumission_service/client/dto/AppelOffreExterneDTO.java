@@ -2,6 +2,7 @@ package com.klodit.soumission_service.client.dto;
 
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * DTO représentant un Appel d'Offres tel que retourné par le Service AO
@@ -26,4 +27,5 @@ public class AppelOffreExterneDTO {
     private LocalDateTime dateOuverturePlis;
     private String typeAppel; // OUVERT, RESTREINT, GRE_A_GRE, CONSULTATION
     private Boolean cautionRequise;
+    private List<LotExterneDTO> lots;
 }

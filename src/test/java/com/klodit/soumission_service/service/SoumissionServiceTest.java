@@ -3,6 +3,8 @@ package com.klodit.soumission_service.service;
 import com.klodit.soumission_service.client.AppelOffreClient;
 import com.klodit.soumission_service.client.DocumentsClient;
 import com.klodit.soumission_service.client.UtilisateurClient;
+import com.klodit.soumission_service.client.dto.AppelOffreExterneDTO;
+import com.klodit.soumission_service.client.dto.LotExterneDTO;
 import com.klodit.soumission_service.dto.request.CreateSoumissionRequest;
 import com.klodit.soumission_service.dto.response.SoumissionResponse;
 import com.klodit.soumission_service.entity.Soumission;
@@ -10,10 +12,7 @@ import com.klodit.soumission_service.enums.StatutSoumission;
 import com.klodit.soumission_service.exception.OffreDejaDeposeeException;
 import com.klodit.soumission_service.exception.SoumissionNotFoundException;
 import com.klodit.soumission_service.messaging.publisher.SoumissionEventPublisher;
-import com.klodit.soumission_service.repository.CautionRepository;
-import com.klodit.soumission_service.repository.OffreFinanciereRepository;
-import com.klodit.soumission_service.repository.OffreTechniqueRepository;
-import com.klodit.soumission_service.repository.SoumissionRepository;
+import com.klodit.soumission_service.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,6 +41,8 @@ class SoumissionServiceTest {
         private OffreFinanciereRepository offreFinanciereRepository;
         @Mock
         private CautionRepository cautionRepository;
+        @Mock
+        private LigneOffreFinanciereRepository ligneOffreFinanciereRepository;
         @Mock
         private HorodatageService horodatageService;
         @Mock
@@ -81,9 +82,20 @@ class SoumissionServiceTest {
                                 .lotId("lot-001")
                                 .build();
 
+                AppelOffreExterneDTO ao = AppelOffreExterneDTO.builder()
+                                .id("ao-001")
+                                .statut("PUBLIE")
+                                .lots(List.of(
+                                                LotExterneDTO.builder()
+                                                                .id("lot-001")
+                                                                .designation("Lot 1")
+                                                                .build()
+                                ))
+                                .build();
+
                 when(soumissionRepository.findByAppelOffreIdAndOperateurIdAndLotId(
                                 any(), any(), any())).thenReturn(Optional.empty());
-                when(appelOffreClient.isAppelOffrePublie("ao-001")).thenReturn(true);
+                when(appelOffreClient.getAppelOffre("ao-001")).thenReturn(Optional.of(ao));
                 when(soumissionRepository.save(any(Soumission.class))).thenAnswer(invocation -> {
                         Soumission s = invocation.getArgument(0);
                         s.setCreatedAt(LocalDateTime.now());
@@ -98,6 +110,7 @@ class SoumissionServiceTest {
                 assertThat(response.getOperateurId()).isEqualTo("oe-456");
                 assertThat(response.getReference()).startsWith("SOUM-");
                 verify(soumissionRepository).save(any(Soumission.class));
+                verify(ligneOffreFinanciereRepository).save(any());
         }
 
         @Test

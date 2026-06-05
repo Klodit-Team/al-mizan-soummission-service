@@ -1,6 +1,7 @@
 package com.klodit.soumission_service.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.klodit.soumission_service.config.JacksonConfig;
 import com.klodit.soumission_service.config.SecurityConfig;
 import com.klodit.soumission_service.dto.request.DechiffrementRequest;
 import com.klodit.soumission_service.dto.response.OffreFinanciereResponse;
@@ -30,7 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(OffreFinanciereController.class)
-@Import({ SecurityConfig.class })
+@Import({ SecurityConfig.class, JacksonConfig.class })
 @TestPropertySource(properties = "security.filter.enabled=false")
 @DisplayName("OffreFinanciereController — Tests MockMvc")
 class OffreFinanciereControllerTest {
@@ -69,15 +70,25 @@ class OffreFinanciereControllerTest {
                                 .build();
 
                 when(offreFinanciereService.deposerOffreFinanciere(
-                                eq("soum-001"), eq("op-001"), any(), eq("clientHash"),
-                                eq("sig-base64"), eq("PEM-key")))
+                                eq("soum-001"), eq("op-001"), any(), any()))
                                 .thenReturn(response);
+
+                String donnees = objectMapper.writeValueAsString(
+                                java.util.Map.of(
+                                                "hashClient", "clientHash",
+                                                "signatureEcdsa", "sig-base64",
+                                                "clePubliqueEcdsaPem", "PEM-key",
+                                                "lignes", java.util.List.of(
+                                                                java.util.Map.of("articleId", "art-001", "prixUnitaire", 1000)
+                                                )
+                                )
+                );
+                MockMultipartFile donneesFile = new MockMultipartFile(
+                                "donnees", "", "application/json", donnees.getBytes());
 
                 mockMvc.perform(multipart("/api/v1/soumissions/soum-001/offre-financiere")
                                 .file(fichier)
-                                .param("hashClient", "clientHash")
-                                .param("signatureEcdsa", "sig-base64")
-                                .param("clePubliqueEcdsaPem", "PEM-key"))
+                                .file(donneesFile))
                                 .andExpect(status().isCreated())
                                 .andExpect(jsonPath("$.success").value(true))
                                 .andExpect(jsonPath("$.data.id").value("of-001"))
@@ -93,13 +104,24 @@ class OffreFinanciereControllerTest {
                                 "fichierChiffre", "offre.enc", "application/octet-stream", "data".getBytes());
 
                 when(offreFinanciereService.deposerOffreFinanciere(
-                                eq("soum-999"), anyString(), any(), any(), any(), any()))
+                                eq("soum-999"), anyString(), any(), any()))
                                 .thenThrow(new SoumissionNotFoundException("soum-999"));
+
+                String donnees = objectMapper.writeValueAsString(
+                                java.util.Map.of(
+                                                "signatureEcdsa", "sig",
+                                                "clePubliqueEcdsaPem", "pem",
+                                                "lignes", java.util.List.of(
+                                                                java.util.Map.of("articleId", "art-001", "prixUnitaire", 1000)
+                                                )
+                                )
+                );
+                MockMultipartFile donneesFile = new MockMultipartFile(
+                                "donnees", "", "application/json", donnees.getBytes());
 
                 mockMvc.perform(multipart("/api/v1/soumissions/soum-999/offre-financiere")
                                 .file(fichier)
-                                .param("signatureEcdsa", "sig")
-                                .param("clePubliqueEcdsaPem", "pem"))
+                                .file(donneesFile))
                                 .andExpect(status().isNotFound());
         }
 
@@ -112,13 +134,24 @@ class OffreFinanciereControllerTest {
                                 "fichierChiffre", "offre.enc", "application/octet-stream", "data".getBytes());
 
                 when(offreFinanciereService.deposerOffreFinanciere(
-                                eq("soum-001"), anyString(), any(), any(), any(), any()))
+                                eq("soum-001"), anyString(), any(), any()))
                                 .thenThrow(new IllegalStateException("pas en BROUILLON"));
+
+                String donnees = objectMapper.writeValueAsString(
+                                java.util.Map.of(
+                                                "signatureEcdsa", "sig",
+                                                "clePubliqueEcdsaPem", "pem",
+                                                "lignes", java.util.List.of(
+                                                                java.util.Map.of("articleId", "art-001", "prixUnitaire", 1000)
+                                                )
+                                )
+                );
+                MockMultipartFile donneesFile = new MockMultipartFile(
+                                "donnees", "", "application/json", donnees.getBytes());
 
                 mockMvc.perform(multipart("/api/v1/soumissions/soum-001/offre-financiere")
                                 .file(fichier)
-                                .param("signatureEcdsa", "sig")
-                                .param("clePubliqueEcdsaPem", "pem"))
+                                .file(donneesFile))
                                 .andExpect(status().isConflict());
         }
 
