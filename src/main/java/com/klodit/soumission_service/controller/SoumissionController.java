@@ -1,10 +1,15 @@
 package com.klodit.soumission_service.controller;
 
 import com.klodit.soumission_service.dto.request.CreateSoumissionRequest;
+import com.klodit.soumission_service.dto.request.SignalerAnomalieRequest;
 import com.klodit.soumission_service.dto.request.StatutSoumissionRequest;
+import com.klodit.soumission_service.dto.response.AnomaliesParAoResponse;
 import com.klodit.soumission_service.dto.response.ApiResponse;
 import com.klodit.soumission_service.dto.response.SoumissionDetailResponse;
 import com.klodit.soumission_service.dto.response.SoumissionResponse;
+import com.klodit.soumission_service.entity.AnomalieIa;
+import com.klodit.soumission_service.repository.AnomalieIaRepository;
+import com.klodit.soumission_service.repository.SoumissionRepository;
 import com.klodit.soumission_service.security.RbacGuard;
 import com.klodit.soumission_service.service.SoumissionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -26,6 +32,8 @@ public class SoumissionController {
 
     private final SoumissionService soumissionService;
     private final RbacGuard rbacGuard;
+    private final AnomalieIaRepository anomalieIaRepository;
+    private final SoumissionRepository soumissionRepository;
 
     /**
      * US-1 : Créer une soumission en brouillon
@@ -157,6 +165,62 @@ public class SoumissionController {
         rbacGuard.requireRole(httpServletRequest, "ADMIN", "MEMBRE_COMMISSION");
         SoumissionResponse response = soumissionService.changerStatut(id, request.getStatut());
         return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    /**
+     * Résumé des anomalies IA pour toutes les soumissions d'un AO.
+     */
+    @GetMapping("/appel-offre/{aoId}/anomalies")
+    @Operation(
+        summary = "Résumé des anomalies IA par AO (Agent Anomalie)",
+        description = "Retourne le résumé consolidé des anomalies détectées par l'agent IA pour toutes les soumissions d'un appel d'offres donné."
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Résumé des anomalies récupéré avec succès."),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé.")
+    })
+    public ResponseEntity<ApiResponse<AnomaliesParAoResponse>> getAnomaliesParAo(
+            @PathVariable String aoId,
+            HttpServletRequest httpServletRequest) {
+
+        rbacGuard.requireRole(httpServletRequest, "SERVICE_CONTRACTANT", "ADMIN", "CONTROLEUR", "MEMBRE_COMMISSION");
+        AnomaliesParAoResponse result = soumissionService.getAnomaliesParAo(aoId);
+        return ResponseEntity.ok(ApiResponse.ok(result));
+    }
+
+    /**
+     * Signaler une anomalie IA sur une soumission.
+     * Réservé au SYSTEME (agent IA) ou à l'ADMIN.
+     */
+    @PostMapping("/{id}/anomalies")
+    @Operation(
+        summary = "Signaler une anomalie IA (Agent Anomalie)",
+        description = "Enregistre une anomalie détectée par l'agent IA (collusion, pattern de prix, saucissonnage) pour une soumission donnée."
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "Anomalie enregistrée avec succès."),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Soumission introuvable."),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé.")
+    })
+    public ResponseEntity<ApiResponse<AnomalieIa>> signalerAnomalie(
+            @PathVariable String id,
+            @Valid @RequestBody SignalerAnomalieRequest request,
+            HttpServletRequest httpServletRequest) {
+
+        rbacGuard.requireRole(httpServletRequest, "ADMIN", "SYSTEME");
+
+        soumissionRepository.findById(id).orElseThrow(() ->
+            new ResponseStatusException(HttpStatus.NOT_FOUND, "Soumission introuvable : " + id));
+
+        AnomalieIa anomalie = anomalieIaRepository.save(AnomalieIa.builder()
+            .soumissionId(id)
+            .anomalyType(request.getAnomalyType())
+            .detail(request.getDetail())
+            .confidence(request.getConfidence())
+            .build());
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(ApiResponse.ok(anomalie, "Anomalie IA enregistrée"));
     }
 
     // ── Utilitaire : extraction IP client ──

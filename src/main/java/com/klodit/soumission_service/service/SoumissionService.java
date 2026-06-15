@@ -6,6 +6,7 @@ import com.klodit.soumission_service.client.UtilisateurClient;
 import com.klodit.soumission_service.client.dto.AppelOffreExterneDTO;
 import com.klodit.soumission_service.client.dto.LotExterneDTO;
 import com.klodit.soumission_service.dto.request.CreateSoumissionRequest;
+import com.klodit.soumission_service.dto.response.AnomaliesParAoResponse;
 import com.klodit.soumission_service.dto.response.SoumissionDetailResponse;
 import com.klodit.soumission_service.dto.response.SoumissionResponse;
 import com.klodit.soumission_service.dto.response.LigneOffreFinanciereResponse;
@@ -22,6 +23,7 @@ import com.klodit.soumission_service.repository.CautionRepository;
 import com.klodit.soumission_service.repository.LigneOffreFinanciereRepository;
 import com.klodit.soumission_service.repository.OffreFinanciereRepository;
 import com.klodit.soumission_service.repository.OffreTechniqueRepository;
+import com.klodit.soumission_service.repository.AnomalieIaRepository;
 import com.klodit.soumission_service.repository.SoumissionRepository;
 import com.klodit.soumission_service.util.ReferenceGenerator;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +33,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -49,6 +53,7 @@ public class SoumissionService {
         private final AppelOffreClient appelOffreClient;
         private final UtilisateurClient utilisateurClient;
         private final DocumentsClient documentsClient;
+        private final AnomalieIaRepository anomalieIaRepository;
 
         /**
          * US-1 : Créer une soumission en brouillon
@@ -380,5 +385,45 @@ public class SoumissionService {
                                 .lignesOffreFinanciere(lignes)
                                 // Sous-objets mappés si présents (lazy loading dans la transaction)
                                 .build();
+        }
+
+        /**
+         * Récupérer le résumé des anomalies IA pour toutes les soumissions d'un AO
+         */
+        public AnomaliesParAoResponse getAnomaliesParAo(String appelOffreId) {
+                List<String> soumissionIds = soumissionRepository
+                        .findByAppelOffreIdOrderByCreatedAtDesc(appelOffreId)
+                        .stream()
+                        .map(s -> s.getId())
+                        .toList();
+
+                if (soumissionIds.isEmpty()) {
+                        return AnomaliesParAoResponse.builder()
+                                .totalAnomalies(0)
+                                .breakdown(Map.of())
+                                .flaggedBids(List.of())
+                                .build();
+                }
+
+                var anomalies = anomalieIaRepository.findBySoumissionIdIn(soumissionIds);
+
+                Map<String, Long> breakdown = anomalies.stream()
+                        .collect(Collectors.groupingBy(a -> a.getAnomalyType(), Collectors.counting()));
+
+                List<AnomaliesParAoResponse.FlaggedBid> flaggedBids = anomalies.stream()
+                        .map(a -> AnomaliesParAoResponse.FlaggedBid.builder()
+                                .soumissionId(a.getSoumissionId())
+                                .anomalyType(a.getAnomalyType())
+                                .detail(a.getDetail())
+                                .confidence(a.getConfidence())
+                                .detectedAt(a.getDetectedAt())
+                                .build())
+                        .toList();
+
+                return AnomaliesParAoResponse.builder()
+                        .totalAnomalies(anomalies.size())
+                        .breakdown(breakdown)
+                        .flaggedBids(flaggedBids)
+                        .build();
         }
 }
