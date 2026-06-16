@@ -62,8 +62,10 @@ class CautionControllerTest {
 
                 String donnees = mapper.writeValueAsString(
                                 java.util.Map.of(
-                                                "compteBancaireId", "rib-001",
+                                                "banque", "CPA",
+                                                "montant", 1000000,
                                                 "reference", "CB-2025-001",
+                                                "dateEmission", "2025-01-01T00:00:00",
                                                 "dateExpiration", "2026-01-01T00:00:00"));
 
                 MockMultipartFile donneesFile = new MockMultipartFile(
@@ -73,7 +75,9 @@ class CautionControllerTest {
 
                 CautionResponse response = CautionResponse.builder()
                                 .id("cau-001")
-                                .compteBancaireId("rib-001")
+                                .banque("CPA")
+                                .montant(java.math.BigDecimal.valueOf(1000000))
+                                .dateEmission(emission)
                                 .reference("CB-2025-001")
                                 .statut(StatutCaution.VALIDE)
                                 .dateExpiration(expiration)
@@ -88,7 +92,7 @@ class CautionControllerTest {
                                 .andExpect(status().isCreated())
                                 .andExpect(jsonPath("$.success").value(true))
                                 .andExpect(jsonPath("$.data.id").value("cau-001"))
-                                .andExpect(jsonPath("$.data.compteBancaireId").value("rib-001"));
+                                .andExpect(jsonPath("$.data.banque").value("CPA"));
         }
 
         @Test
@@ -96,7 +100,7 @@ class CautionControllerTest {
         void ajouterCaution_notFound_404() throws Exception {
                 MockMultipartFile donneesFile = new MockMultipartFile(
                                 "donnees", "", "application/json",
-                                "{\"compteBancaireId\":\"rib-001\",\"reference\":\"ref\",\"dateExpiration\":\"2026-01-01T00:00:00\"}"
+                                "{\"banque\":\"CPA\",\"montant\":1000000,\"reference\":\"ref\",\"dateEmission\":\"2025-01-01T00:00:00\",\"dateExpiration\":\"2026-01-01T00:00:00\"}"
                                                 .getBytes());
                 MockMultipartFile scanFile = new MockMultipartFile(
                                 "scanCaution", "scan.pdf", "application/pdf", "data".getBytes());
@@ -115,7 +119,7 @@ class CautionControllerTest {
         void ajouterCaution_statutInvalide_409() throws Exception {
                 MockMultipartFile donneesFile = new MockMultipartFile(
                                 "donnees", "", "application/json",
-                                "{\"compteBancaireId\":\"rib-001\",\"reference\":\"ref\",\"dateExpiration\":\"2026-01-01T00:00:00\"}"
+                                "{\"banque\":\"CPA\",\"montant\":1000000,\"reference\":\"ref\",\"dateEmission\":\"2025-01-01T00:00:00\",\"dateExpiration\":\"2026-01-01T00:00:00\"}"
                                                 .getBytes());
                 MockMultipartFile scanFile = new MockMultipartFile(
                                 "scanCaution", "scan.pdf", "application/pdf", "data".getBytes());
@@ -136,7 +140,9 @@ class CautionControllerTest {
         void getCaution_200() throws Exception {
                 CautionResponse response = CautionResponse.builder()
                                 .id("cau-001")
-                                .compteBancaireId("rib-001")
+                                .banque("CPA")
+                                .montant(java.math.BigDecimal.valueOf(1000000))
+                                .dateEmission(LocalDateTime.of(2025, 1, 1, 0, 0))
                                 .reference("CB-001")
                                 .statut(StatutCaution.VALIDE)
                                 .build();
@@ -145,7 +151,7 @@ class CautionControllerTest {
 
                 mockMvc.perform(get("/api/v1/soumissions/soum-001/caution"))
                                 .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.data.compteBancaireId").value("rib-001"))
+                                .andExpect(jsonPath("$.data.banque").value("CPA"))
                                 .andExpect(jsonPath("$.data.statut").value("VALIDE"));
         }
 
