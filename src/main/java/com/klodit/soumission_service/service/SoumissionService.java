@@ -302,6 +302,11 @@ public class SoumissionService {
                                                 .declenchePar("SYSTEM")
                                                 .build());
 
+                // Déclencher l'analyse IA (détection d'anomalies) lors de l'ouverture des plis
+                if (nouveauStatut == StatutSoumission.OUVERTE) {
+                        eventPublisher.publierSoumissionsClosed(soumission.getAppelOffreId());
+                }
+
                 return toResponse(soumission);
         }
 

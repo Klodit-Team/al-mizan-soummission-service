@@ -127,4 +127,25 @@ public class SoumissionEventPublisher {
             log.error("Échec publication offre.financiere.analyse.demandee : {}", e.getMessage(), e);
         }
     }
+
+    /**
+     * Publie l'événement de clôture des soumissions (pour déclencher l'IA).
+     * Consommé par : AI Orchestrator.
+     */
+    @Async
+    public void publierSoumissionsClosed(String aoId) {
+        try {
+            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("aoId", aoId);
+            payload.put("soumissionId", null);
+            
+            rabbitTemplate.convertAndSend(
+                    RabbitMQConfig.SOUMISSION_EXCHANGE,
+                    "soumissions.closed",
+                    payload);
+            log.info("Événement publié → soumissions.closed | AO: {}", aoId);
+        } catch (Exception e) {
+            log.error("Échec publication soumissions.closed : {}", e.getMessage(), e);
+        }
+    }
 }
