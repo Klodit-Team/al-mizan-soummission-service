@@ -62,12 +62,19 @@ public class SoumissionService {
         public SoumissionResponse creerBrouillon(CreateSoumissionRequest request, String operateurId) {
                 log.info("Création brouillon — AO: {}, OE: {}", request.getAppelOffreId(), operateurId);
 
-                // Vérifier unicité (un OE ne soumet qu'une fois par AO + lot)
-                soumissionRepository.findByAppelOffreIdAndOperateurIdAndLotId(
-                                request.getAppelOffreId(), operateurId, request.getLotId()).ifPresent(s -> {
-                                        throw new OffreDejaDeposeeException(
-                                                        "soumission pour cet appel d'offres et ce lot");
-                                });
+                java.util.Optional<Soumission> existingOpt = soumissionRepository.findByAppelOffreIdAndOperateurIdAndLotId(
+                                request.getAppelOffreId(), operateurId, request.getLotId());
+
+                if (existingOpt.isPresent()) {
+                        Soumission existing = existingOpt.get();
+                        if (existing.getStatut() == StatutSoumission.BROUILLON) {
+                                log.info("Brouillon existant trouvé, on le retourne. ID: {}", existing.getId());
+                                return toResponse(existing);
+                        } else {
+                                throw new OffreDejaDeposeeException(
+                                                "soumission pour cet appel d'offres et ce lot");
+                        }
+                }
 
                 // Vérifier que l'AO existe et est en statut PUBLIE
                 java.util.Optional<AppelOffreExterneDTO> aoOpt = appelOffreClient

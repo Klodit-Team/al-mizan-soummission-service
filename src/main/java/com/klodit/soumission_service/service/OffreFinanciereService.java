@@ -71,47 +71,34 @@ public class OffreFinanciereService {
             throw new FichierInvalideException("Les lignes de l'offre financière sont obligatoires");
         }
 
-        for (DepotOffreFinanciereRequest.LigneOffreRequest item : request.getLignes()) {
-            if (item.getDesignation() != null || item.getQuantite() != null || item.getUnite() != null) {
-                throw new FichierInvalideException(
-                        "Interdiction formelle de modifier ou de renseigner les colonnes relatives aux désignations, quantités et unités.");
-            }
-        }
-
-        // 3. Charger les lignes de BPU pré-remplies en base
+        // 3. Remplacer le BPU par celui soumis par l'opérateur
         List<LigneOffreFinanciere> lignesDb = ligneOffreFinanciereRepository.findBySoumissionId(soumissionId);
-        if (lignesDb.isEmpty()) {
-            throw new FichierInvalideException("Aucun BPU pré-rempli trouvé pour cette soumission.");
+        if (!lignesDb.isEmpty()) {
+            ligneOffreFinanciereRepository.deleteAll(lignesDb);
+            ligneOffreFinanciereRepository.flush();
         }
-
-        // Vérifier que le nombre d'éléments correspond
-        if (request.getLignes().size() != lignesDb.size()) {
-            throw new FichierInvalideException("La structure du BPU soumis est différente de la structure originale (nombre de lignes incorrect).");
-        }
-
-        // Mapper les IDs pour vérification d'exactitude
-        java.util.Map<String, LigneOffreFinanciere> mapDb = lignesDb.stream()
-                .collect(java.util.stream.Collectors.toMap(LigneOffreFinanciere::getId, l -> l));
 
         java.math.BigDecimal totalHt = java.math.BigDecimal.ZERO;
 
         for (DepotOffreFinanciereRequest.LigneOffreRequest item : request.getLignes()) {
-            LigneOffreFinanciere ligneDb = mapDb.get(item.getArticleId());
-            if (ligneDb == null) {
-                throw new FichierInvalideException("L'article ID " + item.getArticleId() + " ne correspond à aucune ligne originale du BPU.");
-            }
-            // Enregistrer le prix unitaire
-            ligneDb.setPrixUnitaire(item.getPrixUnitaire());
-            ligneOffreFinanciereRepository.save(ligneDb);
+            LigneOffreFinanciere nouvelleLigne = LigneOffreFinanciere.builder()
+                    .soumission(soumission)
+                    .designation(item.getDesignation() != null ? item.getDesignation() : "Article")
+                    .quantite(item.getQuantite() != null ? item.getQuantite() : java.math.BigDecimal.ONE)
+                    .unite(item.getUnite() != null ? item.getUnite() : "U")
+                    .prixUnitaire(item.getPrixUnitaire())
+                    .build();
 
-            // Calculer montant HT de la ligne (prix * quantite)
-            java.math.BigDecimal ligneMontant = item.getPrixUnitaire().multiply(ligneDb.getQuantite());
+            ligneOffreFinanciereRepository.save(nouvelleLigne);
+
+            java.math.BigDecimal ligneMontant = nouvelleLigne.getPrixUnitaire().multiply(nouvelleLigne.getQuantite());
             totalHt = totalHt.add(ligneMontant);
         }
 
-        // 4. Vérifier qu'aucune offre financière n'a déjà été déposée
+        // 4. Si une offre financière existe déjà, on la supprime (réécriture lors d'un retry)
         offreFinanciereRepository.findBySoumissionId(soumissionId).ifPresent(of -> {
-            throw new OffreDejaDeposeeException("offre financière");
+            offreFinanciereRepository.delete(of);
+            offreFinanciereRepository.flush();
         });
 
         // 5. Calculer les montants globaux

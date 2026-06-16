@@ -57,9 +57,10 @@ public class OffreTechniqueService {
                             "Statut actuel : " + soumission.getStatut());
         }
 
-        // 3. Vérifier qu'aucune offre technique n'a déjà été déposée
+        // 3. Si une offre technique existe déjà, on la supprime (réécriture lors d'un retry)
         offreTechniqueRepository.findBySoumissionId(soumissionId).ifPresent(ot -> {
-            throw new OffreDejaDeposeeException("offre technique");
+            offreTechniqueRepository.delete(ot);
+            offreTechniqueRepository.flush();
         });
 
         try {

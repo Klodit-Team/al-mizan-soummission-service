@@ -49,9 +49,10 @@ public class CautionService {
             throw new IllegalStateException("La caution ne peut être ajoutée qu'en statut BROUILLON");
         }
 
-        // Vérifier qu'aucune caution n'existe déjà
+        // Si une caution existe déjà, on la supprime (réécriture lors d'un retry)
         cautionRepository.findBySoumissionId(soumissionId).ifPresent(c -> {
-            throw new OffreDejaDeposeeException("caution bancaire");
+            cautionRepository.delete(c);
+            cautionRepository.flush();
         });
 
         // Valider les dates
