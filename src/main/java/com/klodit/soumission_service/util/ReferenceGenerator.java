@@ -18,7 +18,7 @@ public final class ReferenceGenerator {
 
     public static String generate() {
         String date = LocalDate.now().format(DATE_FMT);
-        long seq = counter.incrementAndGet();
-        return String.format("SOUM-%s-%05d", date, seq);
+        String randomStr = java.util.UUID.randomUUID().toString().substring(0, 5).toUpperCase();
+        return String.format("SOUM-%s-%s", date, randomStr);
     }
 }
