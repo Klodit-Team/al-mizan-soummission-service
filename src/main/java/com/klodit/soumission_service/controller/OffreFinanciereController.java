@@ -21,6 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequiredArgsConstructor
+@lombok.extern.slf4j.Slf4j
 @Tag(name = "Offres Financières", description = "Dépôt chiffré et déchiffrement des offres financières")
 public class OffreFinanciereController {
 
@@ -56,6 +57,7 @@ public class OffreFinanciereController {
                 String operateurId = rbacGuard.getUserId(httpServletRequest);
 
                 DepotOffreFinanciereRequest request;
+                log.info("Donnees JSON recues: {}", donneesJson);
                 try {
                         request = objectMapper.readValue(donneesJson, DepotOffreFinanciereRequest.class);
                 } catch (Exception e) {
