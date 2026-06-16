@@ -25,11 +25,17 @@ public class Caution {
     @JoinColumn(name = "soumission_id", nullable = false)
     private Soumission soumission;
 
-    @Column(name = "compte_bancaire_id", nullable = false, length = 100)
-    private String compteBancaireId;
+    @Column(nullable = false)
+    private java.math.BigDecimal montant;
+
+    @Column(nullable = false, length = 255)
+    private String banque;
 
     @Column(nullable = false, length = 100)
     private String reference;
+
+    @Column(name = "date_emission", nullable = false)
+    private LocalDateTime dateEmission;
 
     @Column(name = "date_expiration", nullable = false)
     private LocalDateTime dateExpiration;

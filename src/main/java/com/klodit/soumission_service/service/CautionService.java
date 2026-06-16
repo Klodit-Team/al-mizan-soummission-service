@@ -68,19 +68,21 @@ public class CautionService {
 
             Caution caution = Caution.builder()
                     .soumission(soumission)
-                    .compteBancaireId(request.getCompteBancaireId())
+                    .montant(request.getMontant())
+                    .banque(request.getBanque())
                     .reference(request.getReference())
+                    .dateEmission(request.getDateEmission())
                     .dateExpiration(request.getDateExpiration())
                     .statut(StatutCaution.VALIDE)
                     .fichierUrl(fichierUrl)
                     .build();
 
             caution = cautionRepository.save(caution);
-            log.info("Caution enregistrée — ID: {}, compteBancaireId: {}, reference: {}",
-                    caution.getId(), caution.getCompteBancaireId(), caution.getReference());
+            log.info("Caution enregistrée — ID: {}, banque: {}, reference: {}",
+                    caution.getId(), caution.getBanque(), caution.getReference());
 
             auditLogService.logDepot(soumissionId, operateurId, "CAUTION", true,
-                    "Compte: " + request.getCompteBancaireId() + ", Réf: " + request.getReference());
+                    "Banque: " + request.getBanque() + ", Réf: " + request.getReference());
 
             return toResponse(caution);
 
@@ -106,8 +108,10 @@ public class CautionService {
     private CautionResponse toResponse(Caution c) {
         return CautionResponse.builder()
                 .id(c.getId())
-                .compteBancaireId(c.getCompteBancaireId())
+                .montant(c.getMontant())
+                .banque(c.getBanque())
                 .reference(c.getReference())
+                .dateEmission(c.getDateEmission())
                 .dateExpiration(c.getDateExpiration())
                 .statut(c.getStatut())
                 .fichierUrl(c.getFichierUrl())

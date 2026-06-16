@@ -15,12 +15,17 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class CreateCautionRequest {
 
-    @NotBlank(message = "Le compte bancaire est obligatoire")
-    @JsonAlias("banque")
-    private String compteBancaireId;
+    @NotNull(message = "Le montant est obligatoire")
+    private java.math.BigDecimal montant;
+
+    @NotBlank(message = "La banque est obligatoire")
+    private String banque;
 
     @NotBlank(message = "La référence de la caution est obligatoire")
     private String reference;
+
+    @NotNull(message = "La date d'émission est obligatoire")
+    private LocalDateTime dateEmission;
 
     @NotNull(message = "La date d'expiration est obligatoire")
     private LocalDateTime dateExpiration;

@@ -11,8 +11,10 @@ import java.time.LocalDateTime;
 @Builder
 public class CautionResponse {
     private String id;
-    private String compteBancaireId;
+    private java.math.BigDecimal montant;
+    private String banque;
     private String reference;
+    private LocalDateTime dateEmission;
     private LocalDateTime dateExpiration;
     private StatutCaution statut;
     private String fichierUrl;
