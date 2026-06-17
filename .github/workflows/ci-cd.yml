@@ -46,7 +46,7 @@ jobs:
         image: mysql:8.0
         env:
           MYSQL_DATABASE: soumission_db
-          MYSQL_ROOT_PASSWORD: testroot
+          MYSQL_ROOT_PASSWORD: password
           MYSQL_USER: test
           MYSQL_PASSWORD: test
         ports:
@@ -67,6 +67,12 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: "temurin"
           cache: "maven"
+
+      - name: Start Redis, RabbitMQ, and MinIO for integration tests
+        run: |
+          docker run -d --name test-redis -p 6379:6379 redis:7-alpine
+          docker run -d --name test-rabbitmq -p 5672:5672 rabbitmq:3-management
+          docker run -d --name test-minio -p 9000:9000 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin minio/minio:latest server /data
 
       - name: Build + Tests unitaires
         run: mvn clean verify -B -Dspring.profiles.active=test
@@ -95,6 +101,22 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-test
 
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: soumission_db
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_USER: test
+          MYSQL_PASSWORD: test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -105,6 +127,12 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: "temurin"
           cache: "maven"
+
+      - name: Start Redis, RabbitMQ, and MinIO for integration tests
+        run: |
+          docker run -d --name test-redis -p 6379:6379 redis:7-alpine
+          docker run -d --name test-rabbitmq -p 5672:5672 rabbitmq:3-management
+          docker run -d --name test-minio -p 9000:9000 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin minio/minio:latest server /data
 
       - name: Tests d'intégration
         run: mvn verify -B -Dgroups=integration -Dspring.profiles.active=test -Djacoco.skip=true
