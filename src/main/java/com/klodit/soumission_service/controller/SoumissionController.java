@@ -231,4 +231,33 @@ public class SoumissionController {
         }
         return request.getRemoteAddr();
     }
+
+    /**
+     * Télécharger un document de la soumission (caution, offre-technique, offre-financiere)
+     */
+    @GetMapping("/{id}/documents/{documentType}/download")
+    @Operation(summary = "Télécharger un document", description = "Télécharge le fichier brut d'un document de la soumission (caution, offre-technique, offre-financiere).")
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Fichier téléchargé avec succès."),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé."),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Document introuvable.")
+    })
+    public ResponseEntity<org.springframework.core.io.Resource> telechargerDocument(
+            @PathVariable String id,
+            @PathVariable String documentType,
+            HttpServletRequest httpServletRequest) {
+
+        rbacGuard.requireRole(httpServletRequest, "OPERATEUR_ECONOMIQUE", "MEMBRE_COMMISSION", "ADMIN", "CONTROLEUR", "SERVICE_CONTRACTANT");
+        
+        java.io.InputStream is = soumissionService.telechargerDocument(id, documentType);
+        org.springframework.core.io.InputStreamResource resource = new org.springframework.core.io.InputStreamResource(is);
+        
+        String ext = "offre-technique".equals(documentType) ? ".zip" : ".pdf";
+        String filename = documentType + "-" + id + ext;
+        
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM)
+                .body(resource);
+    }
 }
