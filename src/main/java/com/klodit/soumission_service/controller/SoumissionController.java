@@ -249,11 +249,17 @@ public class SoumissionController {
 
         rbacGuard.requireRole(httpServletRequest, "OPERATEUR_ECONOMIQUE", "MEMBRE_COMMISSION", "ADMIN", "CONTROLEUR", "SERVICE_CONTRACTANT");
         
+        String fileUrl = soumissionService.getDocumentUrl(id, documentType);
+        String filename = documentType + "-" + id;
+        if (fileUrl != null && fileUrl.contains("/")) {
+            String originalName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+            if (!originalName.isBlank()) {
+                filename = originalName;
+            }
+        }
+
         java.io.InputStream is = soumissionService.telechargerDocument(id, documentType);
         org.springframework.core.io.InputStreamResource resource = new org.springframework.core.io.InputStreamResource(is);
-        
-        String ext = "offre-technique".equals(documentType) ? ".zip" : ".pdf";
-        String filename = documentType + "-" + id + ext;
         
         return ResponseEntity.ok()
                 .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")

@@ -444,6 +444,15 @@ public class SoumissionService {
          * Télécharger un document de la soumission
          */
         public java.io.InputStream telechargerDocument(String soumissionId, String documentType) {
+                String fichierUrl = getDocumentUrl(soumissionId, documentType);
+                String[] parts = fichierUrl.split("/", 2);
+                if (parts.length != 2) {
+                        throw new IllegalStateException("Format d'URL de fichier invalide : " + fichierUrl);
+                }
+                return minIOService.telechargerFichier(parts[0], parts[1]);
+        }
+
+        public String getDocumentUrl(String soumissionId, String documentType) {
                 String fichierUrl = null;
                 if ("caution".equalsIgnoreCase(documentType)) {
                         fichierUrl = cautionRepository.findBySoumissionId(soumissionId)
@@ -464,12 +473,6 @@ public class SoumissionService {
                 if (fichierUrl == null || fichierUrl.isEmpty()) {
                         throw new com.klodit.soumission_service.exception.RessourceIntrouvableException("Fichier", "document " + documentType);
                 }
-
-                String[] parts = fichierUrl.split("/", 2);
-                if (parts.length != 2) {
-                        throw new IllegalStateException("Format d'URL de fichier invalide : " + fichierUrl);
-                }
-
-                return minIOService.telechargerFichier(parts[0], parts[1]);
+                return fichierUrl;
         }
 }
