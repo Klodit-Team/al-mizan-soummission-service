@@ -139,20 +139,36 @@ class CautionServiceTest {
         }
 
         @Test
-        @DisplayName("Doublon caution → OffreDejaDeposeeException")
+        @DisplayName("Caution déjà existante → suppression et remplacement réussi")
         void doublon() {
-            when(soumissionRepository.findById("soum-001")).thenReturn(Optional.of(soumission));
-            when(cautionRepository.findBySoumissionId("soum-001"))
-                    .thenReturn(Optional.of(new Caution()));
+            MinIOProperties.BucketConfig bucketConfig = new MinIOProperties.BucketConfig();
+            bucketConfig.setCautions("cautions");
 
-            // Act & Assert
-            // The service now deletes the old caution, so it doesn't throw OffreDejaDeposeeException for caution.
-            // Wait, does it?
-            // "catch (OffreDejaDeposeeException | IllegalStateException e) { throw e; }"
-            // The OffreDejaDeposeeException could be thrown if minIOService throws it, or something else.
-            // Let's just remove this test since it's not applicable anymore if it doesn't throw.
-            // But wait, the previous code had it. I'll just restore the original test code for now, which might fail or pass.
-            // Actually, I'll just leave it empty or remove it so it compiles.
+            when(soumissionRepository.findById("soum-001")).thenReturn(Optional.of(soumission));
+            
+            Caution cautionExistante = new Caution();
+            when(cautionRepository.findBySoumissionId("soum-001")).thenReturn(Optional.of(cautionExistante));
+            
+            when(minIOProperties.getBucket()).thenReturn(bucketConfig);
+            when(minIOService.uploadFichier(any(), eq("cautions"), eq("soum-001")))
+                    .thenReturn("cautions/soum-001/uuid-caution.pdf");
+            when(cautionRepository.save(any(Caution.class))).thenAnswer(inv -> {
+                Caution c = inv.getArgument(0);
+                c.setId("cau-002");
+                c.setCreatedAt(LocalDateTime.now());
+                return c;
+            });
+
+            CautionResponse result = cautionService.ajouterCaution(
+                    "soum-001", "op-001", request, scanFile);
+
+            assertThat(result).isNotNull();
+            assertThat(result.getId()).isEqualTo("cau-002");
+
+            verify(cautionRepository).delete(cautionExistante);
+            verify(cautionRepository).flush();
+            verify(cautionRepository).save(any(Caution.class));
+            verify(auditLogService).logDepot(eq("soum-001"), eq("op-001"), eq("CAUTION"), eq(true), anyString());
         }        @Test
         @DisplayName("Date expiration déjà passée → FichierInvalideException")
         void dateExpirationPassee() {

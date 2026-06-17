@@ -197,6 +197,26 @@ public class CleChiffrementService {
         }
     }
 
+    /**
+     * Récupère la liste des fragments Shamir (index, valeur, membreId)
+     * pour un appel d'offres donné.
+     */
+    public List<com.klodit.soumission_service.dto.request.DechiffrementRequest.FragmentSoumis> getFragments(String appelOffreId) {
+        CleChiffrement cle = cleChiffrementRepository.findByAppelOffreId(appelOffreId)
+                .orElseThrow(() -> new com.klodit.soumission_service.exception.RessourceIntrouvableException(
+                        "Clé de chiffrement", "appel d'offres " + appelOffreId));
+
+        List<FragmentCle> entityFragments = fragmentCleRepository.findByCleChiffrementId(cle.getId());
+
+        return entityFragments.stream()
+                .map(f -> com.klodit.soumission_service.dto.request.DechiffrementRequest.FragmentSoumis.builder()
+                        .index(f.getFragmentIndex())
+                        .valeur(f.getFragmentChiffre())
+                        .membreId(f.getMembreCommissionId())
+                        .build())
+                .toList();
+    }
+
     private CleChiffrementResponse toResponse(CleChiffrement c) {
         return CleChiffrementResponse.builder()
                 .id(c.getId())
@@ -208,3 +228,4 @@ public class CleChiffrementService {
                 .build();
     }
 }
+

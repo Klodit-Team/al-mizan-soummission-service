@@ -71,4 +71,26 @@ public class CleChiffrementController {
                 CleChiffrementResponse response = cleChiffrementService.getClePublique(aoId);
                 return ResponseEntity.ok(ApiResponse.ok(response));
         }
+
+        /**
+         * US-7 : Récupérer les fragments Shamir d'un AO (pour les membres de la commission).
+         */
+        @GetMapping("/{aoId}/fragments")
+        @Operation(summary = "Récupérer les fragments Shamir d'un AO", description = "Retourne la liste de tous les fragments Shamir de l'AO. "
+                        + "Normalement appelé par le frontend de la commission pour collecter les fragments des membres présents.")
+        @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Fragments récupérés avec succès."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé (rôles requis: MEMBRE_COMMISSION, ADMIN)."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Clés ou Appel d'offres introuvables.")
+        })
+        public ResponseEntity<ApiResponse<List<com.klodit.soumission_service.dto.request.DechiffrementRequest.FragmentSoumis>>> getFragments(
+                        @io.swagger.v3.oas.annotations.Parameter(description = "UUID de l'Appel d'offres", required = true, schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", format = "uuid"))
+                        @PathVariable String aoId,
+                        HttpServletRequest httpServletRequest) {
+
+                rbacGuard.requireRole(httpServletRequest, "MEMBRE_COMMISSION", "ADMIN");
+                List<com.klodit.soumission_service.dto.request.DechiffrementRequest.FragmentSoumis> response = cleChiffrementService.getFragments(aoId);
+                return ResponseEntity.ok(ApiResponse.ok(response));
+        }
 }
+

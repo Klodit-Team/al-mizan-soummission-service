@@ -53,6 +53,7 @@ public class DechiffrementService {
     private final SoumissionEventPublisher eventPublisher;
     private final MinIOProperties minIOProperties;
     private final com.klodit.soumission_service.client.AppelOffreClient appelOffreClient;
+    private final com.klodit.soumission_service.repository.SoumissionRepository soumissionRepository;
 
     /**
      * US-7 : Déchiffrer toutes les offres financières d'un AO.
@@ -154,6 +155,27 @@ public class DechiffrementService {
                     // 9. Mettre à jour l'entité : marquée déchiffrée + URL du fichier clair
                     offre.setFichierClairUrl(fichierClairUrl);
                     offreFinanciereService.mettreAJourApresDecryptage(offre);
+
+                    // 9b. Passer la soumission à l'état OUVERTE (Loi 23-12)
+                    com.klodit.soumission_service.entity.Soumission soumission = offre.getSoumission();
+                    com.klodit.soumission_service.enums.StatutSoumission ancienStatut = soumission.getStatut();
+                    soumission.setStatut(com.klodit.soumission_service.enums.StatutSoumission.OUVERTE);
+                    soumissionRepository.save(soumission);
+
+                    // Publier l'événement de changement de statut
+                    eventPublisher.publierStatutChange(
+                            com.klodit.soumission_service.messaging.event.SoumissionStatutChangeEvent.builder()
+                                    .soumissionId(soumission.getId())
+                                    .reference(soumission.getReference())
+                                    .appelOffreId(appelOffreId)
+                                    .ancienStatut(ancienStatut != null ? ancienStatut.name() : "DEPOSEE")
+                                    .nouveauStatut(com.klodit.soumission_service.enums.StatutSoumission.OUVERTE.name())
+                                    .horodatage(LocalDateTime.now())
+                                    .declenchePar(membreId)
+                                    .build());
+
+                    // Déclencher l'analyse IA (détection d'anomalies) lors de l'ouverture
+                    eventPublisher.publierSoumissionsClosed(appelOffreId);
 
                     // 10. Publier la demande d'analyse OCR vers le Service IA
                     // → Le Service IA fera l'OCR du PDF pour extraire montantHt, tva, montantTtc

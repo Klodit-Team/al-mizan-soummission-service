@@ -10,6 +10,7 @@ import com.klodit.soumission_service.exception.ChiffrementException;
 import com.klodit.soumission_service.messaging.event.OffreFinanciereAnalyseDemandeEvent;
 import com.klodit.soumission_service.messaging.event.OffresDecrypteesEvent;
 import com.klodit.soumission_service.messaging.publisher.SoumissionEventPublisher;
+import com.klodit.soumission_service.repository.SoumissionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import javax.crypto.SecretKey;
+import java.io.InputStream;
 import java.io.ByteArrayInputStream;
 import java.nio.ByteBuffer;
 import java.security.KeyPair;
@@ -53,6 +55,8 @@ class DechiffrementServiceTest {
     private MinIOProperties minIOProperties;
     @Mock
     private AppelOffreClient appelOffreClient;
+    @Mock
+    private SoumissionRepository soumissionRepository;
 
     @InjectMocks
     private DechiffrementService dechiffrementService;
@@ -106,6 +110,7 @@ class DechiffrementServiceTest {
                 .id("soum-001")
                 .appelOffreId(aoId)
                 .operateurId("op-001")
+                .statut(com.klodit.soumission_service.enums.StatutSoumission.DEPOSEE)
                 .build();
 
         OffreFinanciere offre = OffreFinanciere.builder()
@@ -251,7 +256,12 @@ class DechiffrementServiceTest {
                 .thenReturn(mockPrivateKey);
 
         // Deux offres : la première échoue, la seconde réussit
-        Soumission soum1 = Soumission.builder().id("soum-fail").appelOffreId(aoId).operateurId("op-1").build();
+        Soumission soum1 = Soumission.builder()
+                .id("soum-fail")
+                .appelOffreId(aoId)
+                .operateurId("op-1")
+                .statut(com.klodit.soumission_service.enums.StatutSoumission.DEPOSEE)
+                .build();
         OffreFinanciere offreFail = OffreFinanciere.builder()
                 .id("of-fail")
                 .soumission(soum1)
@@ -259,7 +269,12 @@ class DechiffrementServiceTest {
                 .isDechiffree(false)
                 .build();
 
-        Soumission soum2 = Soumission.builder().id("soum-ok").appelOffreId(aoId).operateurId("op-2").build();
+        Soumission soum2 = Soumission.builder()
+                .id("soum-ok")
+                .appelOffreId(aoId)
+                .operateurId("op-2")
+                .statut(com.klodit.soumission_service.enums.StatutSoumission.DEPOSEE)
+                .build();
         OffreFinanciere offreOk = OffreFinanciere.builder()
                 .id("of-ok")
                 .soumission(soum2)
@@ -320,7 +335,12 @@ class DechiffrementServiceTest {
         when(cleChiffrementService.reconstituerClePrivee(eq(aoId), anyList()))
                 .thenReturn(mockPrivateKey);
 
-        Soumission soum = Soumission.builder().id("soum-montants").appelOffreId(aoId).operateurId("op-1").build();
+        Soumission soum = Soumission.builder()
+                .id("soum-montants")
+                .appelOffreId(aoId)
+                .operateurId("op-1")
+                .statut(com.klodit.soumission_service.enums.StatutSoumission.DEPOSEE)
+                .build();
         OffreFinanciere offre = OffreFinanciere.builder()
                 .id("of-montants")
                 .soumission(soum)
