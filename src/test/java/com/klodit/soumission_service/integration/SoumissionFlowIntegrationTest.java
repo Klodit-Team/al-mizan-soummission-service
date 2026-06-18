@@ -150,8 +150,10 @@ class SoumissionFlowIntegrationTest extends AbstractIntegrationTest {
                                 "Attestation de caution bancaire de test".getBytes());
 
                 String cautionJson = objectMapper.writeValueAsString(Map.of(
-                                "compteBancaireId", "rib-integration-001",
+                                "banque", "BNA - Banque Nationale d'Algérie",
+                                "montant", 500000,
                                 "reference", "CAUT-2025-001",
+                                "dateEmission", "2025-01-15T00:00:00",
                                 "dateExpiration", "2027-07-15T00:00:00"));
 
                 MockMultipartFile donnees = new MockMultipartFile(
