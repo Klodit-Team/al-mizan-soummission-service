@@ -204,10 +204,20 @@ jobs:
         uses: azure/setup-kubectl@v4
 
       - name: Set kubeconfig
-        run: mkdir -p $HOME/.kube && echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > $HOME/.kube/config
+        run: |
+          if [ -z "${{ secrets.KUBE_CONFIG_STAGING }}" ]; then
+            echo "⚠️  Secret KUBE_CONFIG_STAGING non configuré — déploiement staging ignoré"
+            exit 0
+          fi
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > $HOME/.kube/config
 
       - name: Deploy to Staging
         run: |
+          if [ ! -s "$HOME/.kube/config" ]; then
+            echo "⚠️  Kubeconfig vide — déploiement staging ignoré"
+            exit 0
+          fi
           export IMAGE_TAG=$(echo ${{ github.sha }} | cut -c1-7)
           kubectl set image deployment/soumission-service \
             soumission-service=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} \
@@ -234,10 +244,20 @@ jobs:
         uses: azure/setup-kubectl@v4
 
       - name: Set kubeconfig
-        run: mkdir -p $HOME/.kube && echo "${{ secrets.KUBE_CONFIG_PROD }}" | base64 -d > $HOME/.kube/config
+        run: |
+          if [ -z "${{ secrets.KUBE_CONFIG_PROD }}" ]; then
+            echo "⚠️  Secret KUBE_CONFIG_PROD non configuré — déploiement production ignoré"
+            exit 0
+          fi
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG_PROD }}" | base64 -d > $HOME/.kube/config
 
       - name: Deploy to Production
         run: |
+          if [ ! -s "$HOME/.kube/config" ]; then
+            echo "⚠️  Kubeconfig vide — déploiement production ignoré"
+            exit 0
+          fi
           export IMAGE_TAG=$(echo ${{ github.sha }} | cut -c1-7)
           kubectl set image deployment/soumission-service \
             soumission-service=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} \
@@ -246,5 +266,9 @@ jobs:
 
       - name: Smoke test
         run: |
+          if [ ! -s "$HOME/.kube/config" ]; then
+            echo "⚠️  Kubeconfig vide — smoke test ignoré"
+            exit 0
+          fi
           sleep 10
           curl -f https://soumission.al-mizan.dz/actuator/health || exit 1
