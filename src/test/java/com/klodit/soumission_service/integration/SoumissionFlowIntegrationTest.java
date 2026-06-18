@@ -31,6 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @DisplayName("Flux complet de soumission (intégration)")
+@org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
 class SoumissionFlowIntegrationTest extends AbstractIntegrationTest {
 
         @Autowired

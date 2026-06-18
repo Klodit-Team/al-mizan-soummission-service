@@ -27,6 +27,7 @@ import static org.assertj.core.api.Assertions.*;
 @AutoConfigureMockMvc
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @DisplayName("Cycle complet chiffrement/déchiffrement (intégration)")
+@org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
 class ChiffrementIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired

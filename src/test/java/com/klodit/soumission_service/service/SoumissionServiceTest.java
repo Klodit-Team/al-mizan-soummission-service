@@ -122,7 +122,9 @@ class SoumissionServiceTest {
                                 .build();
 
                 when(soumissionRepository.findByAppelOffreIdAndOperateurIdAndLotId(
-                                any(), any(), any())).thenReturn(Optional.of(new Soumission()));
+                                any(), any(), any())).thenReturn(Optional.of(
+                                                Soumission.builder().statut(StatutSoumission.DEPOSEE).build()
+                                ));
 
                 assertThatThrownBy(() -> soumissionService.creerBrouillon(request, "oe-456"))
                                 .isInstanceOf(OffreDejaDeposeeException.class)

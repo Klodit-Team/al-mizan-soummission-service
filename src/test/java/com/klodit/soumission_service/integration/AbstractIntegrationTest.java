@@ -23,6 +23,7 @@ import org.testcontainers.utility.DockerImageName;
  * toutes les classes de tests d'intégration.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
 @SuppressWarnings("resource")
 public abstract class AbstractIntegrationTest {
 

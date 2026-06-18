@@ -103,20 +103,50 @@ class OffreTechniqueServiceTest {
         }
 
         @Test
-        @DisplayName("Dépôt offre technique — doublon → OffreDejaDeposeeException")
-        void deposer_doublon_leve_exception() {
+        @DisplayName("Dépôt offre technique — doublon → suppression et remplacement réussi")
+        void deposer_doublon_remplacement_succes() {
                 Soumission soumission = Soumission.builder()
                                 .id("soum-001")
                                 .operateurId("oe-001")
+                                .appelOffreId("ao-001")
                                 .statut(StatutSoumission.BROUILLON)
                                 .build();
 
-                when(soumissionRepository.findById("soum-001")).thenReturn(Optional.of(soumission));
-                when(offreTechniqueRepository.findBySoumissionId("soum-001"))
-                                .thenReturn(Optional.of(new OffreTechnique()));
+                MockMultipartFile fichier = new MockMultipartFile(
+                                "fichier", "cahier.pdf", "application/pdf", "PDF content".getBytes());
 
-                assertThatThrownBy(() -> offreTechniqueService.deposerOffreTechnique("soum-001", "oe-001", null, null))
-                                .isInstanceOf(OffreDejaDeposeeException.class);
+                MinIOProperties.BucketConfig bucketConfig = new MinIOProperties.BucketConfig();
+                bucketConfig.setOffresTechniques("offres-techniques");
+
+                when(soumissionRepository.findById("soum-001")).thenReturn(Optional.of(soumission));
+                
+                OffreTechnique ancienneOffre = new OffreTechnique();
+                when(offreTechniqueRepository.findBySoumissionId("soum-001"))
+                                .thenReturn(Optional.of(ancienneOffre));
+
+                when(hashService.calculerHash(any(org.springframework.web.multipart.MultipartFile.class)))
+                                .thenReturn("sha256hash");
+                when(minIOProperties.getBucket()).thenReturn(bucketConfig);
+                when(minIOService.uploadFichier(any(), eq("offres-techniques"), eq("soum-001")))
+                                .thenReturn("offres-techniques/soum-001/uuid-cahier.pdf");
+                when(offreTechniqueRepository.save(any(OffreTechnique.class))).thenAnswer(inv -> {
+                        OffreTechnique ot = inv.getArgument(0);
+                        ot.setId("ot-002");
+                        return ot;
+                });
+
+                OffreTechniqueResponse result = offreTechniqueService.deposerOffreTechnique(
+                                "soum-001", "oe-001", fichier, null);
+
+                assertThat(result).isNotNull();
+                assertThat(result.getId()).isEqualTo("ot-002");
+
+                verify(offreTechniqueRepository).delete(ancienneOffre);
+                verify(offreTechniqueRepository).flush();
+                verify(offreTechniqueRepository).save(any(OffreTechnique.class));
+                verify(auditLogService).logDepot(eq("soum-001"), eq("oe-001"), eq("OFFRE_TECHNIQUE"), eq(true),
+                                anyString());
+                verify(eventPublisher).publierDemandeAnalyseOCR(any());
         }
 
         @Test

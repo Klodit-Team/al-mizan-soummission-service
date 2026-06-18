@@ -8,6 +8,8 @@ import com.klodit.soumission_service.dto.response.SoumissionDetailResponse;
 import com.klodit.soumission_service.dto.response.SoumissionResponse;
 import com.klodit.soumission_service.enums.StatutSoumission;
 import com.klodit.soumission_service.exception.SoumissionNotFoundException;
+import com.klodit.soumission_service.repository.AnomalieIaRepository;
+import com.klodit.soumission_service.repository.SoumissionRepository;
 import com.klodit.soumission_service.security.RbacGuard;
 import com.klodit.soumission_service.service.SoumissionService;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,6 +47,12 @@ class SoumissionControllerTest {
 
         @MockitoBean
         private RbacGuard rbacGuard;
+
+        @MockitoBean
+        private AnomalieIaRepository anomalieIaRepository;
+
+        @MockitoBean
+        private SoumissionRepository soumissionRepository;
 
         @BeforeEach
         void setupRbacGuard() {

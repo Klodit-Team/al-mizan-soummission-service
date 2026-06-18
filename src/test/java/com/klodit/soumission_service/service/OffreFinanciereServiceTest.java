@@ -28,6 +28,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.argThat;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("OffreFinanciereService — Tests unitaires")
@@ -360,10 +361,10 @@ class OffreFinanciereServiceTest {
                 }
 
                 @Test
-                @DisplayName("Doublon offre financière → OffreDejaDeposeeException")
+                @DisplayName("Doublon offre financière → supprimée et remplacée (stratégie remplacement)")
                 void doublon() {
                         Soumission soumission = Soumission.builder()
-                                         .id("soum-001").operateurId("op-001")
+                                         .id("soum-001").operateurId("op-001").appelOffreId("ao-001")
                                          .statut(StatutSoumission.BROUILLON).build();
                         MockMultipartFile fichier = new MockMultipartFile(
                                          "fichierChiffre", "offre.enc", "application/octet-stream", "data".getBytes());
@@ -388,25 +389,50 @@ class OffreFinanciereServiceTest {
                                                                         .build()
                                         ))
                                         .build();
+
+                        MinIOProperties.BucketConfig bucketConfig = new MinIOProperties.BucketConfig();
+                        bucketConfig.setOffresFinancieres("offres-financieres");
+
+                        OffreFinanciere offreExistante = new OffreFinanciere();
 
                         when(soumissionRepository.findById("soum-001")).thenReturn(Optional.of(soumission));
                         when(ligneOffreFinanciereRepository.findBySoumissionId("soum-001")).thenReturn(lignesBpu);
                         when(offreFinanciereRepository.findBySoumissionId("soum-001"))
-                                         .thenReturn(Optional.of(new OffreFinanciere()));
+                                         .thenReturn(Optional.of(offreExistante));
+                        when(hashService.calculerHash(any(org.springframework.web.multipart.MultipartFile.class)))
+                                         .thenReturn("hashCipher");
+                        when(minIOProperties.getBucket()).thenReturn(bucketConfig);
+                        when(minIOService.uploadFichier(any(), eq("offres-financieres"), eq("soum-001")))
+                                         .thenReturn("offres-financieres/soum-001/uuid-offre.enc");
+                        when(offreFinanciereRepository.save(any(OffreFinanciere.class))).thenAnswer(inv -> {
+                                OffreFinanciere of = inv.getArgument(0);
+                                of.setId("of-new");
+                                return of;
+                        });
+                        when(chiffrementService.reconstruireClePubliqueECDSA(anyString()))
+                                         .thenThrow(new RuntimeException("Invalid PEM for test"));
 
-                        assertThatThrownBy(() -> offreFinanciereService.deposerOffreFinanciere(
-                                         "soum-001", "op-001", fichier, request))
-                                         .isInstanceOf(OffreDejaDeposeeException.class);
+                        // Le service supprime l'ancienne et crée une nouvelle — aucune exception
+                        OffreFinanciereResponse result = offreFinanciereService.deposerOffreFinanciere(
+                                         "soum-001", "op-001", fichier, request);
+
+                        assertThat(result).isNotNull();
+                        // L'ancienne offre a bien été supprimée
+                        verify(offreFinanciereRepository).delete(offreExistante);
+                        verify(offreFinanciereRepository).save(any(OffreFinanciere.class));
                 }
 
                 @Test
-                @DisplayName("Payload avec colonnes descriptives interdites → FichierInvalideException")
+                @DisplayName("Payload avec designation fournie → acceptée (service utilise la designation du payload)")
                 void payloadColonnesDescriptivesInterdites() {
                         Soumission soumission = Soumission.builder()
-                                         .id("soum-001").operateurId("op-001")
+                                         .id("soum-001").operateurId("op-001").appelOffreId("ao-001")
                                          .statut(StatutSoumission.BROUILLON).build();
                         MockMultipartFile fichier = new MockMultipartFile(
                                          "fichierChiffre", "offre.enc", "application/octet-stream", "data".getBytes());
+
+                        MinIOProperties.BucketConfig bucketConfig = new MinIOProperties.BucketConfig();
+                        bucketConfig.setOffresFinancieres("offres-financieres");
 
                         DepotOffreFinanciereRequest request = DepotOffreFinanciereRequest.builder()
                                         .hashClient("clientHash")
@@ -416,24 +442,42 @@ class OffreFinanciereServiceTest {
                                                         DepotOffreFinanciereRequest.LigneOffreRequest.builder()
                                                                         .articleId("ligne-001")
                                                                         .prixUnitaire(new BigDecimal("1000.00"))
-                                                                        .designation("INTERDIT") // Col descriptive interdite
+                                                                        .designation("Ma désignation")
                                                                         .build()
                                         ))
                                         .build();
 
                         when(soumissionRepository.findById("soum-001")).thenReturn(Optional.of(soumission));
+                        when(ligneOffreFinanciereRepository.findBySoumissionId("soum-001")).thenReturn(List.of());
+                        when(offreFinanciereRepository.findBySoumissionId("soum-001")).thenReturn(Optional.empty());
+                        when(hashService.calculerHash(any(org.springframework.web.multipart.MultipartFile.class)))
+                                         .thenReturn("hashCipher");
+                        when(minIOProperties.getBucket()).thenReturn(bucketConfig);
+                        when(minIOService.uploadFichier(any(), eq("offres-financieres"), eq("soum-001")))
+                                         .thenReturn("offres-financieres/soum-001/uuid-offre.enc");
+                        when(offreFinanciereRepository.save(any(OffreFinanciere.class))).thenAnswer(inv -> {
+                                OffreFinanciere of = inv.getArgument(0);
+                                of.setId("of-001");
+                                return of;
+                        });
+                        when(chiffrementService.reconstruireClePubliqueECDSA(anyString()))
+                                         .thenThrow(new RuntimeException("Invalid PEM for test"));
 
-                        assertThatThrownBy(() -> offreFinanciereService.deposerOffreFinanciere(
-                                         "soum-001", "op-001", fichier, request))
-                                         .isInstanceOf(FichierInvalideException.class)
-                                         .hasMessageContaining("Interdiction formelle");
+                        // La designation fournie est utilisée telle quelle
+                        OffreFinanciereResponse result = offreFinanciereService.deposerOffreFinanciere(
+                                         "soum-001", "op-001", fichier, request);
+
+                        assertThat(result).isNotNull();
+                        // Vérifier que la ligne a été sauvegardée avec la désignation fournie
+                        verify(ligneOffreFinanciereRepository).save(argThat(ligne ->
+                                "Ma désignation".equals(ligne.getDesignation())));
                 }
 
                 @Test
-                @DisplayName("Structure BPU modifiée (nombre lignes) → FichierInvalideException")
+                @DisplayName("Plusieurs lignes soumises → toutes sauvegardées (stratégie remplacement)")
                 void structureBpuModifieeNombreLignes() {
                         Soumission soumission = Soumission.builder()
-                                         .id("soum-001").operateurId("op-001")
+                                         .id("soum-001").operateurId("op-001").appelOffreId("ao-001")
                                          .statut(StatutSoumission.BROUILLON).build();
                         MockMultipartFile fichier = new MockMultipartFile(
                                          "fichierChiffre", "offre.enc", "application/octet-stream", "data".getBytes());
@@ -446,6 +490,9 @@ class OffreFinanciereServiceTest {
                                                         .unite("LOT")
                                                         .build()
                         );
+
+                        MinIOProperties.BucketConfig bucketConfig = new MinIOProperties.BucketConfig();
+                        bucketConfig.setOffresFinancieres("offres-financieres");
 
                         DepotOffreFinanciereRequest request = DepotOffreFinanciereRequest.builder()
                                         .hashClient("clientHash")
@@ -459,17 +506,35 @@ class OffreFinanciereServiceTest {
                                                         DepotOffreFinanciereRequest.LigneOffreRequest.builder()
                                                                         .articleId("ligne-002")
                                                                         .prixUnitaire(new BigDecimal("2000.00"))
-                                                                        .build() // Deuxième ligne rajoutée frauduleusement
+                                                                        .build()
                                         ))
                                         .build();
 
                         when(soumissionRepository.findById("soum-001")).thenReturn(Optional.of(soumission));
                         when(ligneOffreFinanciereRepository.findBySoumissionId("soum-001")).thenReturn(lignesBpu);
+                        when(offreFinanciereRepository.findBySoumissionId("soum-001")).thenReturn(Optional.empty());
+                        when(hashService.calculerHash(any(org.springframework.web.multipart.MultipartFile.class)))
+                                         .thenReturn("hashCipher");
+                        when(minIOProperties.getBucket()).thenReturn(bucketConfig);
+                        when(minIOService.uploadFichier(any(), eq("offres-financieres"), eq("soum-001")))
+                                         .thenReturn("offres-financieres/soum-001/uuid-offre.enc");
+                        when(offreFinanciereRepository.save(any(OffreFinanciere.class))).thenAnswer(inv -> {
+                                OffreFinanciere of = inv.getArgument(0);
+                                of.setId("of-001");
+                                return of;
+                        });
+                        when(chiffrementService.reconstruireClePubliqueECDSA(anyString()))
+                                         .thenThrow(new RuntimeException("Invalid PEM for test"));
 
-                        assertThatThrownBy(() -> offreFinanciereService.deposerOffreFinanciere(
-                                         "soum-001", "op-001", fichier, request))
-                                         .isInstanceOf(FichierInvalideException.class)
-                                         .hasMessageContaining("nombre de lignes incorrect");
+                        // Le service accepte toutes les lignes et remplace le BPU
+                        OffreFinanciereResponse result = offreFinanciereService.deposerOffreFinanciere(
+                                         "soum-001", "op-001", fichier, request);
+
+                        assertThat(result).isNotNull();
+                        // 2 nouvelles lignes sauvegardées (les 2 du payload)
+                        verify(ligneOffreFinanciereRepository, times(2)).save(any(LigneOffreFinanciere.class));
+                        // Les anciennes lignes ont été supprimées
+                        verify(ligneOffreFinanciereRepository).deleteAll(lignesBpu);
                 }
         }
 
