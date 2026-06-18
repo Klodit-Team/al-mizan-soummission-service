@@ -41,13 +41,12 @@ public class SoumissionController {
     @PostMapping
     @Operation(summary = "Créer une soumission (brouillon)", description = "Crée une nouvelle soumission en statut BROUILLON pour un appel d'offres")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "Soumission initialisée avec succès sous forme de BROUILLON."),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Données d'entrée invalides ou manquantes."),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé (rôle OPERATEUR_ECONOMIQUE requis).")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "Soumission initialisée avec succès sous forme de BROUILLON."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Données d'entrée invalides ou manquantes."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé (rôle OPERATEUR_ECONOMIQUE requis).")
     })
     public ResponseEntity<ApiResponse<SoumissionResponse>> creerBrouillon(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Informations de l'AO et du Lot pour initialiser la soumission", required = true)
-            @Valid @RequestBody CreateSoumissionRequest request,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Informations de l'AO et du Lot pour initialiser la soumission", required = true) @Valid @RequestBody CreateSoumissionRequest request,
             HttpServletRequest httpServletRequest) {
 
         rbacGuard.requireRole(httpServletRequest, "OPERATEUR_ECONOMIQUE");
@@ -63,8 +62,8 @@ public class SoumissionController {
     @GetMapping
     @Operation(summary = "Lister mes soumissions", description = "Retourne la liste des soumissions de l'opérateur économique connecté")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Liste de soumissions récupérée avec succès."),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé (rôle OPERATEUR_ECONOMIQUE requis).")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Liste de soumissions récupérée avec succès."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé (rôle OPERATEUR_ECONOMIQUE requis).")
     })
     public ResponseEntity<ApiResponse<List<SoumissionResponse>>> listerMesSoumissions(
             HttpServletRequest httpServletRequest) {
@@ -83,16 +82,15 @@ public class SoumissionController {
     @GetMapping("/{id}")
     @Operation(summary = "Détail d'une soumission", description = "Retourne le détail complet d'une soumission avec ses offres et caution")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Détail de la soumission récupéré avec succès."),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé (rôles requis: OPERATEUR_ECONOMIQUE, MEMBRE_COMMISSION, ADMIN, CONTROLEUR)."),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Soumission introuvable.")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Détail de la soumission récupéré avec succès."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé (rôles requis: OPERATEUR_ECONOMIQUE, MEMBRE_COMMISSION, ADMIN, CONTROLEUR, SERVICE_CONTRACTANT)."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Soumission introuvable.")
     })
     public ResponseEntity<ApiResponse<SoumissionDetailResponse>> getDetail(
-            @io.swagger.v3.oas.annotations.Parameter(description = "UUID unique de la soumission", required = true, schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", format = "uuid"))
-            @PathVariable String id,
+            @io.swagger.v3.oas.annotations.Parameter(description = "UUID unique de la soumission", required = true, schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", format = "uuid")) @PathVariable String id,
             HttpServletRequest httpServletRequest) {
 
-        rbacGuard.requireRole(httpServletRequest, "OPERATEUR_ECONOMIQUE", "MEMBRE_COMMISSION", "ADMIN", "CONTROLEUR");
+        rbacGuard.requireRole(httpServletRequest, "OPERATEUR_ECONOMIQUE", "MEMBRE_COMMISSION", "ADMIN", "CONTROLEUR", "SERVICE_CONTRACTANT");
         SoumissionDetailResponse detail = soumissionService.getDetail(id);
         return ResponseEntity.ok(ApiResponse.ok(detail));
     }
@@ -105,13 +103,12 @@ public class SoumissionController {
     @GetMapping("/appel-offre/{aoId}")
     @Operation(summary = "Soumissions par appel d'offres", description = "Liste toutes les soumissions déposées pour un appel d'offres donné")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Liste des soumissions récupérée avec succès."),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé (rôles requis: SERVICE_CONTRACTANT, MEMBRE_COMMISSION, ADMIN, CONTROLEUR)."),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Appel d'offres introuvable.")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Liste des soumissions récupérée avec succès."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé (rôles requis: SERVICE_CONTRACTANT, MEMBRE_COMMISSION, ADMIN, CONTROLEUR)."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Appel d'offres introuvable.")
     })
     public ResponseEntity<ApiResponse<List<SoumissionResponse>>> listerParAO(
-            @io.swagger.v3.oas.annotations.Parameter(description = "UUID unique de l'appel d'offres", required = true, schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", format = "uuid"))
-            @PathVariable String aoId,
+            @io.swagger.v3.oas.annotations.Parameter(description = "UUID unique de l'appel d'offres", required = true, schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", format = "uuid")) @PathVariable String aoId,
             HttpServletRequest httpServletRequest) {
 
         rbacGuard.requireRole(httpServletRequest, "SERVICE_CONTRACTANT", "MEMBRE_COMMISSION", "ADMIN", "CONTROLEUR");
@@ -125,14 +122,13 @@ public class SoumissionController {
     @PutMapping("/{id}/valider")
     @Operation(summary = "Soumettre définitivement la soumission", description = "Horodate le dépôt côté serveur, vérifie le délai et publie l'événement.")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Soumission validée et soumise définitivement avec horodatage électronique immuable."),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Soumission incomplète (offre technique, financière ou caution manquante) ou date limite dépassée."),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé (rôle OPERATEUR_ECONOMIQUE requis)."),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Soumission introuvable.")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Soumission validée et soumise définitivement avec horodatage électronique immuable."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Soumission incomplète (offre technique, financière ou caution manquante) ou date limite dépassée."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé (rôle OPERATEUR_ECONOMIQUE requis)."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Soumission introuvable.")
     })
     public ResponseEntity<ApiResponse<SoumissionResponse>> valider(
-            @io.swagger.v3.oas.annotations.Parameter(description = "UUID unique de la soumission à valider", required = true, schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", format = "uuid"))
-            @PathVariable String id,
+            @io.swagger.v3.oas.annotations.Parameter(description = "UUID unique de la soumission à valider", required = true, schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", format = "uuid")) @PathVariable String id,
             HttpServletRequest httpRequest) {
 
         rbacGuard.requireRole(httpRequest, "OPERATEUR_ECONOMIQUE");
@@ -150,16 +146,14 @@ public class SoumissionController {
     @PutMapping("/{id}/statut")
     @Operation(summary = "Changer le statut (workflow interne)", description = "Réservé à l'ADMIN et à la MEMBRE_COMMISSION.")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Le statut a été mis à jour avec succès."),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Transition de statut invalide ou corps de requête mal formé."),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé (rôles requis: ADMIN, MEMBRE_COMMISSION)."),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Soumission introuvable.")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Le statut a été mis à jour avec succès."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Transition de statut invalide ou corps de requête mal formé."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé (rôles requis: ADMIN, MEMBRE_COMMISSION)."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Soumission introuvable.")
     })
     public ResponseEntity<ApiResponse<SoumissionResponse>> changerStatut(
-            @io.swagger.v3.oas.annotations.Parameter(description = "UUID unique de la soumission", required = true, schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", format = "uuid"))
-            @PathVariable String id,
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Nouveau statut cible (StatutSoumissionRequest)", required = true)
-            @RequestBody StatutSoumissionRequest request,
+            @io.swagger.v3.oas.annotations.Parameter(description = "UUID unique de la soumission", required = true, schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", format = "uuid")) @PathVariable String id,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Nouveau statut cible (StatutSoumissionRequest)", required = true) @RequestBody StatutSoumissionRequest request,
             HttpServletRequest httpServletRequest) {
 
         rbacGuard.requireRole(httpServletRequest, "ADMIN", "MEMBRE_COMMISSION");
@@ -171,13 +165,10 @@ public class SoumissionController {
      * Résumé des anomalies IA pour toutes les soumissions d'un AO.
      */
     @GetMapping("/appel-offre/{aoId}/anomalies")
-    @Operation(
-        summary = "Résumé des anomalies IA par AO (Agent Anomalie)",
-        description = "Retourne le résumé consolidé des anomalies détectées par l'agent IA pour toutes les soumissions d'un appel d'offres donné."
-    )
+    @Operation(summary = "Résumé des anomalies IA par AO (Agent Anomalie)", description = "Retourne le résumé consolidé des anomalies détectées par l'agent IA pour toutes les soumissions d'un appel d'offres donné.")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Résumé des anomalies récupéré avec succès."),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé.")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Résumé des anomalies récupéré avec succès."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé.")
     })
     public ResponseEntity<ApiResponse<AnomaliesParAoResponse>> getAnomaliesParAo(
             @PathVariable String aoId,
@@ -193,14 +184,11 @@ public class SoumissionController {
      * Réservé au SYSTEME (agent IA) ou à l'ADMIN.
      */
     @PostMapping("/{id}/anomalies")
-    @Operation(
-        summary = "Signaler une anomalie IA (Agent Anomalie)",
-        description = "Enregistre une anomalie détectée par l'agent IA (collusion, pattern de prix, saucissonnage) pour une soumission donnée."
-    )
+    @Operation(summary = "Signaler une anomalie IA (Agent Anomalie)", description = "Enregistre une anomalie détectée par l'agent IA (collusion, pattern de prix, saucissonnage) pour une soumission donnée.")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "Anomalie enregistrée avec succès."),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Soumission introuvable."),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé.")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "Anomalie enregistrée avec succès."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Soumission introuvable."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé.")
     })
     public ResponseEntity<ApiResponse<AnomalieIa>> signalerAnomalie(
             @PathVariable String id,
@@ -209,18 +197,18 @@ public class SoumissionController {
 
         rbacGuard.requireRole(httpServletRequest, "ADMIN", "SYSTEME");
 
-        soumissionRepository.findById(id).orElseThrow(() ->
-            new ResponseStatusException(HttpStatus.NOT_FOUND, "Soumission introuvable : " + id));
+        soumissionRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Soumission introuvable : " + id));
 
         AnomalieIa anomalie = anomalieIaRepository.save(AnomalieIa.builder()
-            .soumissionId(id)
-            .anomalyType(request.getAnomalyType())
-            .detail(request.getDetail())
-            .confidence(request.getConfidence())
-            .build());
+                .soumissionId(id)
+                .anomalyType(request.getAnomalyType())
+                .detail(request.getDetail())
+                .confidence(request.getConfidence())
+                .build());
 
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.ok(anomalie, "Anomalie IA enregistrée"));
+                .body(ApiResponse.ok(anomalie, "Anomalie IA enregistrée"));
     }
 
     // ── Utilitaire : extraction IP client ──
@@ -233,22 +221,24 @@ public class SoumissionController {
     }
 
     /**
-     * Télécharger un document de la soumission (caution, offre-technique, offre-financiere)
+     * Télécharger un document de la soumission (caution, offre-technique,
+     * offre-financiere)
      */
     @GetMapping("/{id}/documents/{documentType}/download")
     @Operation(summary = "Télécharger un document", description = "Télécharge le fichier brut d'un document de la soumission (caution, offre-technique, offre-financiere).")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Fichier téléchargé avec succès."),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé."),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Document introuvable.")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Fichier téléchargé avec succès."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Accès refusé."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Document introuvable.")
     })
     public ResponseEntity<org.springframework.core.io.Resource> telechargerDocument(
             @PathVariable String id,
             @PathVariable String documentType,
             HttpServletRequest httpServletRequest) {
 
-        rbacGuard.requireRole(httpServletRequest, "OPERATEUR_ECONOMIQUE", "MEMBRE_COMMISSION", "ADMIN", "CONTROLEUR", "SERVICE_CONTRACTANT");
-        
+        rbacGuard.requireRole(httpServletRequest, "OPERATEUR_ECONOMIQUE", "MEMBRE_COMMISSION", "ADMIN", "CONTROLEUR",
+                "SERVICE_CONTRACTANT");
+
         String fileUrl = soumissionService.getDocumentUrl(id, documentType);
         String filename = documentType + "-" + id;
         if (fileUrl != null && fileUrl.contains("/")) {
@@ -259,10 +249,12 @@ public class SoumissionController {
         }
 
         java.io.InputStream is = soumissionService.telechargerDocument(id, documentType);
-        org.springframework.core.io.InputStreamResource resource = new org.springframework.core.io.InputStreamResource(is);
-        
+        org.springframework.core.io.InputStreamResource resource = new org.springframework.core.io.InputStreamResource(
+                is);
+
         return ResponseEntity.ok()
-                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + filename + "\"")
                 .contentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM)
                 .body(resource);
     }
